@@ -274,8 +274,8 @@ void scene_model::setup_data(std::map<std::string,GLuint>& shaders, scene_struct
     setup_aabb(shaders);
     triangle_base_configuration();
 
-    texture_wood  = create_texture_gpu(image_load_png("scenes/animation/02_simulation/assets/wood.png"));
-    texture_green = create_texture_gpu(image_load_png("scenes/animation/Pool_game/assets/green.png"));
+    //texture_wood  = create_texture_gpu(image_load_png("scenes/animation/02_simulation/assets/wood.png"));
+    //texture_green = create_texture_gpu(image_load_png("scenes/animation/Pool_game/assets/green.png"));
     sphere = mesh_drawable( mesh_primitive_sphere(1.0f));
     sphere.shader = shaders["mesh"];
 
