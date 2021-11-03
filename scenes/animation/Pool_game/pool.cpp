@@ -14,12 +14,13 @@ void scene_model::frame_draw(std::map<std::string,GLuint>& , scene_structure& sc
 
     set_gui();
 
-    create_new_particle();
     compute_time_step(dt);
 
     display_particles(scene);
     //draw(ground, scene.camera);
     draw(borders, scene.camera);
+
+    check_score();
 
     //draw(pool_visual, scene.camera);
     //glBindTexture(GL_TEXTURE_2D, scene.texture_white);
@@ -146,13 +147,23 @@ void scene_model::compute_time_step(float dt)
 
 }
 
+void scene_model::white_ball_setup() {
+    particle_structure white_ball;
+
+    white_ball.r = radius_ball;
+    white_ball.c = vec3(1, 1, 1);
+    white_ball.p = vec3(0, 0, .8);
+
+    particles.insert(particles.begin(), white_ball);
+}
+
 // Use this function to create the triangle and erase the balls still present in the scene
 void scene_model::triangle_base_configuration() {
     particles.clear();
     static const std::vector<vec3> color_lut = {{1,0,0},{0,1,0},{0,0,1},{1,1,0},{1,0,1},{0,1,1}};
     float diameter_ball = 2.0f * radius_ball;
     float offset_z = std::sqrt(3.0f) * radius_ball; // Found by looking for the z that minimizes the norm between 2 balls
-    vec3 offset_triangle = vec3{-2.0f * diameter_ball, 0.0f, -1.0f};
+    vec3 offset_triangle = vec3{-2.0f * diameter_ball, 0.0f, -.8f};
     for (size_t i = 0; i < 5; ++i) {
         for (size_t j = 0; j < 5 - i; ++j) {
             particle_structure new_ball;
@@ -165,32 +176,6 @@ void scene_model::triangle_base_configuration() {
 
 }
 
-void scene_model::create_new_particle()
-{
-    // Emission of new particle if needed
-    timer.periodic_event_time_step = gui_scene.time_interval_new_sphere;
-    const bool is_new_particle = timer.event;
-    static const std::vector<vec3> color_lut = {{1,0,0},{0,1,0},{0,0,1},{1,1,0},{1,0,1},{0,1,1}};
-
-    if( is_new_particle && gui_scene.add_sphere)
-    {
-        particle_structure new_particle;
-
-        new_particle.r = radius_ball;
-        new_particle.c = color_lut[int(rand_interval()*color_lut.size())];
-
-        // Initial position
-        new_particle.p = vec3(0,0.1f,0);
-
-        // Initial speed
-        const float theta = rand_interval(0, 2*3.14f);
-        new_particle.v = 5.0f * normalize(vec3( 3.0f * std::cos(timer.t), 0.0f, 5.0f * std::sin(timer.t)));
-        //new_particle.v = 5.0f * normalize(vec3(0.3f, 0.0f, 0.68f));
-
-        particles.push_back(new_particle);
-
-    }
-}
 void scene_model::display_particles(scene_structure& scene)
 {
     const size_t N = particles.size();
@@ -273,9 +258,12 @@ void scene_model::setup_data(std::map<std::string,GLuint>& shaders, scene_struct
 {
     setup_aabb(shaders);
     triangle_base_configuration();
+    white_ball_setup();
 
-    //texture_wood  = create_texture_gpu(image_load_png("scenes/animation/02_simulation/assets/wood.png"));
-    //texture_green = create_texture_gpu(image_load_png("scenes/animation/Pool_game/assets/green.png"));
+    score = 0;
+
+    texture_wood  = create_texture_gpu(image_load_png("scenes/animation/02_simulation/assets/wood.png"));
+    texture_green = create_texture_gpu(image_load_png("scenes/animation/Pool_game/assets/green.png"));
     sphere = mesh_drawable( mesh_primitive_sphere(1.0f));
     sphere.shader = shaders["mesh"];
 
@@ -285,14 +273,11 @@ void scene_model::setup_data(std::map<std::string,GLuint>& shaders, scene_struct
     pool_visual.texture_id = texture_wood;
 }
 
-
-
 void scene_model::set_gui()
 {
     // Can set the speed of the animation
     ImGui::SliderFloat("Time scale", &timer.scale, 0.05f, 2.0f, "%.2f s");
-    ImGui::SliderFloat("Interval create sphere", &gui_scene.time_interval_new_sphere, 0.05f, 2.0f, "%.2f s");
-    ImGui::Checkbox("Add sphere", &gui_scene.add_sphere);
+    ImGui::SliderInt("Score", &score, 0, 20);
 
     bool stop_anim  = ImGui::Button("Stop"); ImGui::SameLine();
     bool start_anim = ImGui::Button("Start");
@@ -325,6 +310,66 @@ aabb::aabb(float minX, float maxX, float minY, float maxY, float minZ, float max
         this->maxZ = minZ;
     }
     this->normal = normalize(normal);
+}
+
+bool intersectPlane(const vec3 &n, const vec3 &p0, const ray r, vec3& p)
+{
+    // assuming vectors are all normalized
+    float denom = dot(n, r.u);
+
+    if (denom > 1e-6) {
+        vec3 p0l0 = p0 - r.p;
+        float t = dot(p0l0, n) / denom;
+
+        if (t >= 0) {
+            p = r.p + r.u * t;
+            return true;
+        }
+    }
+
+    return false;
+}
+
+void scene_model::mouse_click(scene_structure& scene, GLFWwindow* window, int , int , int )
+{
+    // Mouse click is used to select a position of the control polygon
+    // ******************************************************************** //
+
+    // Cursor coordinates
+    const vec2 cursor = glfw_cursor_coordinates_window(window);
+
+    // Check that the mouse is clicked (drag and drop)
+    const bool mouse_click_left  = glfw_mouse_pressed_left(window);
+    const bool key_shift = glfw_key_shift_pressed(window);
+
+    // Check if shift key is pressed
+    if(mouse_click_left && key_shift)
+    {
+        // Create the 3D ray passing by the selected point on the screen
+        const ray r = picking_ray(scene.camera, cursor);
+
+        // Check if this ray intersects the ground
+        vec3 p0 = vec3(0, 0, 0);
+        vec3 n = vec3(0, -1, 0);
+
+        vec3 p;
+
+        if (intersectPlane(n, p0, r, p)) {
+            particles[0].v = (p - particles[0].p) * 5.f;
+        }
+    }
+}
+
+void scene_model::check_score()
+{
+    for (size_t i = 1; i < particles.size(); ++i)
+    {
+        if (particles[i].p.y < 0.f) {
+            particles.erase(particles.begin() + i);
+            i--;
+            score++;
+        }
+    }
 }
 
 #endif

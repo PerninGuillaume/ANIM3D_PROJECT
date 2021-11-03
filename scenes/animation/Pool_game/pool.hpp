@@ -43,9 +43,12 @@ struct scene_model : scene_base
     void set_gui();
 
     void compute_time_step(float dt);
-    void create_new_particle();
+    void white_ball_setup();
     void triangle_base_configuration();
     void display_particles(scene_structure& scene);
+
+    void mouse_click(scene_structure& scene, GLFWwindow* window, int button, int action, int mods);
+    void check_score();
 
     // Textures
     GLuint texture_green;
@@ -65,11 +68,7 @@ struct scene_model : scene_base
 
     float radius_ball = 0.03f;
 
+    int score;
 };
-
-
-
-
-
 
 #endif
