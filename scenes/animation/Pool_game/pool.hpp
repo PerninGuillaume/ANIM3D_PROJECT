@@ -35,7 +35,6 @@ struct gui_scene_structure
 
 struct scene_model : scene_base
 {
-
     void setup_data(std::map<std::string,GLuint>& shaders, scene_structure& scene, gui_structure& gui);
     void setup_aabb(std::map<std::string, GLuint>& shaders);
     void frame_draw(std::map<std::string,GLuint>& shaders, scene_structure& scene, gui_structure& gui);
@@ -48,7 +47,12 @@ struct scene_model : scene_base
     void display_particles(scene_structure& scene);
 
     void mouse_click(scene_structure& scene, GLFWwindow* window, int button, int action, int mods);
+
+    bool check_state();
     void check_score();
+    void check_white_ball();
+
+    void update_camera(scene_structure& scene);
 
     // Textures
     GLuint texture_green;
@@ -68,7 +72,11 @@ struct scene_model : scene_base
 
     float radius_ball = 0.03f;
 
-    int score;
+    int score = 0;
+    bool play_allowed = true;
+
+    bool is_throwing = false;
+    vcl::vec3 throw_pos = vcl::vec3(0, 0, 0);
 };
 
 #endif

@@ -17,7 +17,7 @@ struct gui_structure
     GLFWwindow* window;
     std::string window_title;
 
-    bool show_frame_camera     = true;
+    bool show_frame_camera     = false;
     bool show_frame_worldspace = false;
 };
 

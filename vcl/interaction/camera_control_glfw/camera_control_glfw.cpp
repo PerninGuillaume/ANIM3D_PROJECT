@@ -12,7 +12,7 @@ void camera_control_glfw::update_mouse_move(camera_scene& camera, GLFWwindow* wi
     assert(window!=nullptr);
 
     // Get type of click (left, right), is CTRL pressed
-    const bool mouse_click_left  = (glfwGetMouseButton(window,GLFW_MOUSE_BUTTON_LEFT )==GLFW_PRESS);
+    const bool mouse_click_left = (glfwGetMouseButton(window,GLFW_MOUSE_BUTTON_LEFT)==GLFW_PRESS);
     const bool mouse_click_right = (glfwGetMouseButton(window,GLFW_MOUSE_BUTTON_RIGHT)==GLFW_PRESS);
     const bool key_ctrl = (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) || glfwGetKey(window, GLFW_KEY_RIGHT_CONTROL));
     const bool key_shift = (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) || glfwGetKey(window, GLFW_KEY_RIGHT_SHIFT));
@@ -36,14 +36,12 @@ void camera_control_glfw::update_mouse_move(camera_scene& camera, GLFWwindow* wi
     // Set action state accordingly
     camera_action_state state = camera_action_state::none;
 
-    if(!mouse_click_left && !mouse_click_right)
+    if(!mouse_click_right)
         state = camera_action_state::none;
-    else if( mouse_click_left && !key_ctrl )
+    else if( mouse_click_right && !key_ctrl )
         state = camera_action_state::rotation;
     else if( mouse_click_left && key_ctrl )
         state = camera_action_state::translation;
-    else if( mouse_click_right && !key_ctrl )
-        state = camera_action_state::scale;
     else if( mouse_click_right && key_ctrl )
         state = camera_action_state::translation_depth;
 

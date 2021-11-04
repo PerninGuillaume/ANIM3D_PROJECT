@@ -1,7 +1,6 @@
+#include <random>
 
 #include "pool.hpp"
-
-#include <random>
 
 #ifdef POOL_GAME
 
@@ -20,11 +19,17 @@ void scene_model::frame_draw(std::map<std::string,GLuint>& , scene_structure& sc
     //draw(ground, scene.camera);
     draw(borders, scene.camera);
 
+    play_allowed = check_state();
+
+    if (play_allowed) {
+        update_camera(scene);
+    }
+
     check_score();
+    check_white_ball();
 
     //draw(pool_visual, scene.camera);
     //glBindTexture(GL_TEXTURE_2D, scene.texture_white);
-
 }
 
 void scene_model::compute_time_step(float dt)
@@ -33,7 +38,6 @@ void scene_model::compute_time_step(float dt)
     const size_t N = particles.size();
     for(size_t k=0; k<N; ++k)
         particles[k].f = vec3(0,-9.81f,0);
-
 
     // Integrate position and speed of particles through time
     for(size_t k=0; k<N; ++k) {
@@ -85,7 +89,6 @@ void scene_model::compute_time_step(float dt)
 
       }
     }
-
 
     std::vector<vec3> normals_cube = {{0,1,0}};
     std::vector<vec3> points_cube = {{0,0,0}};
@@ -164,6 +167,7 @@ void scene_model::triangle_base_configuration() {
     float diameter_ball = 2.0f * radius_ball;
     float offset_z = std::sqrt(3.0f) * radius_ball; // Found by looking for the z that minimizes the norm between 2 balls
     vec3 offset_triangle = vec3{-2.0f * diameter_ball, 0.0f, -.8f};
+
     for (size_t i = 0; i < 5; ++i) {
         for (size_t j = 0; j < 5 - i; ++j) {
             particle_structure new_ball;
@@ -173,7 +177,6 @@ void scene_model::triangle_base_configuration() {
             particles.push_back(new_ball);
         }
     }
-
 }
 
 void scene_model::display_particles(scene_structure& scene)
@@ -190,7 +193,6 @@ void scene_model::display_particles(scene_structure& scene)
     }
 }
 
-
 // From a struct aabb returns the list of corners, to use for visualization
 std::vector<vec3> segments_from_aabb(const aabb& box) {
     std::vector<vec3> corners{{box.minX, box.minY, box.minZ},
@@ -201,6 +203,7 @@ std::vector<vec3> segments_from_aabb(const aabb& box) {
                               {box.maxX, box.maxY, box.minZ},
                               {box.maxX, box.maxY, box.maxZ},
                               {box.minX, box.maxY, box.maxZ}};
+
     return std::vector<vec3>{corners[0], corners[1], corners[1], corners[2], corners[2], corners[3], corners[3], corners[0],
                              corners[0], corners[4], corners[1], corners[5], corners[2], corners[6], corners[3], corners[7],
                              corners[4], corners[5], corners[5], corners[6], corners[6], corners[7], corners[7], corners[4]};
@@ -224,6 +227,7 @@ void scene_model::setup_aabb(std::map<std::string, GLuint>& shaders) {
     float size_hole = 0.1f;
     float corner_hole_bias = 0.1f;
     float width_hole_side = 0.01f;
+
     // A pool table is symmetric along its z and x axis so we don't need to specify all corners
     std::vector<aabb> corners = {{x_ground - width_hole_side, x_ground, 0, height_border, 0, size_hole / 2.0f, {-1, 0, 0}},
                                  {x_ground - width_border, x_ground - width_hole_side, 0, height_border, size_hole / 2.0f, size_hole / 2.0f, {0, 0, 1}},
@@ -231,6 +235,7 @@ void scene_model::setup_aabb(std::map<std::string, GLuint>& shaders) {
                                  {x_ground - width_hole_side, x_ground, 0, height_border, z_ground - width_border - corner_hole_bias, z_ground - width_hole_side, {-1, 0, 0}},
                                  {x_ground - width_border - corner_hole_bias, x_ground - width_hole_side, 0, height_border, z_ground - width_hole_side, z_ground, {0, 0, -1}},
                                  {0, x_ground - width_border - corner_hole_bias, 0, height_border, z_ground - width_border, z_ground, {0, 0, -1}}};
+
     for (int symmetric_x = -1; symmetric_x <= 1; symmetric_x += 2) {
         for (int symmetric_z = -1; symmetric_z <= 1; symmetric_z += 2) {
             for (auto corner : corners) {
@@ -239,6 +244,7 @@ void scene_model::setup_aabb(std::map<std::string, GLuint>& shaders) {
             }
         }
     }
+
     boundaries.push_back({-x_ground + width_border, x_ground - width_border, 0, 0, -z_ground + width_border, z_ground - width_border, {0,1,0}});
     float height_under_ground = -1.0f;
     boundaries.push_back({-10.0f, 10.0f, height_under_ground, height_under_ground - 1.0f, -10.0f, 10.0f, {0,1,0}});
@@ -250,8 +256,8 @@ void scene_model::setup_aabb(std::map<std::string, GLuint>& shaders) {
     borders.uniform.color = {0,0,0};
     borders.shader = shaders["curve"];
 
-    ground.shader = shaders["mesh_bf"];
-    ground.texture_id = texture_green;
+    // ground.shader = shaders["mesh_bf"];
+    // ground.texture_id = texture_green;
 }
 
 void scene_model::setup_data(std::map<std::string,GLuint>& shaders, scene_structure& , gui_structure& )
@@ -260,17 +266,15 @@ void scene_model::setup_data(std::map<std::string,GLuint>& shaders, scene_struct
     triangle_base_configuration();
     white_ball_setup();
 
-    score = 0;
-
-    texture_wood  = create_texture_gpu(image_load_png("scenes/animation/02_simulation/assets/wood.png"));
-    texture_green = create_texture_gpu(image_load_png("scenes/animation/Pool_game/assets/green.png"));
+    // texture_wood  = create_texture_gpu(image_load_png("scenes/animation/02_simulation/assets/wood.png"));
+    // texture_green = create_texture_gpu(image_load_png("scenes/animation/Pool_game/assets/green.png"));
     sphere = mesh_drawable( mesh_primitive_sphere(1.0f));
     sphere.shader = shaders["mesh"];
 
-    this->pool = mesh_load_file_obj("scenes/animation/Pool_game/assets/pool.obj");
-    pool_visual = mesh_drawable(pool);
-    pool_visual.shader = shaders["mesh_bf"];
-    pool_visual.texture_id = texture_wood;
+    // this->pool = mesh_load_file_obj("scenes/animation/Pool_game/assets/pool.obj");
+    // pool_visual = mesh_drawable(pool);
+    // pool_visual.shader = shaders["mesh_bf"];
+    // pool_visual.texture_id = texture_wood;
 }
 
 void scene_model::set_gui()
@@ -285,7 +289,6 @@ void scene_model::set_gui()
     if(stop_anim)  timer.stop();
     if(start_anim) timer.start();
 }
-
 
 aabb::aabb(float minX, float maxX, float minY, float maxY, float minZ, float maxZ, vcl::vec3 normal) {
     if (minX <= maxX) {
@@ -340,10 +343,10 @@ void scene_model::mouse_click(scene_structure& scene, GLFWwindow* window, int , 
 
     // Check that the mouse is clicked (drag and drop)
     const bool mouse_click_left  = glfw_mouse_pressed_left(window);
-    const bool key_shift = glfw_key_shift_pressed(window);
+    const bool mouse_released_left = glfw_mouse_released_left(window);
 
     // Check if shift key is pressed
-    if(mouse_click_left && key_shift)
+    if(mouse_click_left && play_allowed)
     {
         // Create the 3D ray passing by the selected point on the screen
         const ray r = picking_ray(scene.camera, cursor);
@@ -355,7 +358,40 @@ void scene_model::mouse_click(scene_structure& scene, GLFWwindow* window, int , 
         vec3 p;
 
         if (intersectPlane(n, p0, r, p)) {
-            particles[0].v = (p - particles[0].p) * 5.f;
+            throw_pos = p;
+            is_throwing = true;
+        }
+    }
+
+    else if (mouse_released_left && play_allowed && is_throwing) {
+        // Create the 3D ray passing by the selected point on the screen
+        const ray r = picking_ray(scene.camera, cursor);
+
+        // Check if this ray intersects the ground
+        vec3 p0 = vec3(0, 0, 0);
+        vec3 n = vec3(0, -1, 0);
+
+        vec3 p;
+
+        if (intersectPlane(n, p0, r, p)) {
+            is_throwing = false;
+
+            vec3 throw_dir = normalize(throw_pos - particles[0].p);
+            float distance = dot(-throw_dir, p - throw_pos);
+
+            if (distance <= 0) {
+                return;
+            }
+
+            particles[0].v = normalize(throw_dir) * distance * 5.f;
+
+            float max_speed = 10.f;
+            float norm_speed = norm(particles[0].v);
+            if (norm_speed > max_speed) {
+                particles[0].v = (particles[0].v / norm_speed) * max_speed;
+            }
+
+            particles[0].v.y = 0;
         }
     }
 }
@@ -364,12 +400,35 @@ void scene_model::check_score()
 {
     for (size_t i = 1; i < particles.size(); ++i)
     {
-        if (particles[i].p.y < 0.f) {
+        if (particles[i].p.y <= -.2f) {
             particles.erase(particles.begin() + i);
             i--;
             score++;
         }
     }
+}
+
+void scene_model::check_white_ball()
+{
+    if (particles[0].p.y <= -.2f) {
+        particles[0].p = vec3(0, 0, .8);
+        particles[0].v = vec3(0, 0, 0);
+    }
+}
+
+bool scene_model::check_state()
+{
+    for (const auto& particle: particles) {
+        if (fabs(particle.v.x) > 1e-2 || fabs(particle.v.z) > 1e-2) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+void scene_model::update_camera(scene_structure& scene) {
+    scene.camera.translation = -particles[0].p;
 }
 
 #endif
