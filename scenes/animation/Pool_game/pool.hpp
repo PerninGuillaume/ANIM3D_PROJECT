@@ -72,6 +72,9 @@ struct scene_model : scene_base
 
     float radius_ball = 0.03f;
 
+    float alpha = .985f; // Restitution coefficient in parallel direction (friction)
+    float beta = .985f; // Restitution coefficient in orthogonal direction (impact)
+
     int score = 0;
     bool play_allowed = true;
 

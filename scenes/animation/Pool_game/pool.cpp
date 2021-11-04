@@ -51,8 +51,6 @@ void scene_model::compute_time_step(float dt)
     }
 
     // Collisions with cube
-    const float alpha = 0.95; // Restitution coefficient in parallel direction (friction)
-    const float beta = 0.95; // Restitution coefficient in orthogonal direction (impact)
     const float epsilon = 0.2f;
     const float mu = 0.5f;
     // Collisions between spheres
@@ -93,7 +91,7 @@ void scene_model::compute_time_step(float dt)
     std::vector<vec3> normals_cube = {{0,1,0}};
     std::vector<vec3> points_cube = {{0,0,0}};
     //buffer<vec3> points_cube = pool.position;
-    //buffer<vec3> normals_cube = pool.normal;
+//buffer<vec3> normals_cube = pool.normal;
 
     // Code to check intersection with finite object using aabb
     for (size_t k = 0; k < N; ++k) {
@@ -281,6 +279,8 @@ void scene_model::set_gui()
 {
     // Can set the speed of the animation
     ImGui::SliderFloat("Time scale", &timer.scale, 0.05f, 2.0f, "%.2f s");
+    ImGui::SliderFloat("Friction", &alpha, .97f, .99f, "%.3f s");
+    ImGui::SliderFloat("Impact", &beta, 0.97f, .99f, "%.3f s");
     ImGui::SliderInt("Score", &score, 0, 20);
 
     bool stop_anim  = ImGui::Button("Stop"); ImGui::SameLine();
