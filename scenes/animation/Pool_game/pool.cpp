@@ -13,7 +13,13 @@ void scene_model::frame_draw(std::map<std::string,GLuint>& , scene_structure& sc
 
     set_gui();
 
-    compute_time_step(dt);
+    float partial_dt = dt / steps_in_frame;
+    float partial_alpha = std::pow(alpha, 1.0/steps_in_frame);
+    float partial_beta = std::pow(beta, 1.0/steps_in_frame);
+    for (int i = 0; i < steps_in_frame; ++i) {
+        compute_time_step(dt / steps_in_frame, partial_alpha, partial_beta);
+    }
+    //compute_time_step(dt);
 
     display_particles(scene);
     //draw(ground, scene.camera);
@@ -32,66 +38,44 @@ void scene_model::frame_draw(std::map<std::string,GLuint>& , scene_structure& sc
     //glBindTexture(GL_TEXTURE_2D, scene.texture_white);
 }
 
-void scene_model::compute_time_step(float dt)
-{
-    // Set forces
+void scene_model::check_collisions(float partial_alpha, float partial_beta) {
     const size_t N = particles.size();
-    for(size_t k=0; k<N; ++k)
-        particles[k].f = vec3(0,-9.81f,0);
-
-    // Integrate position and speed of particles through time
-    for(size_t k=0; k<N; ++k) {
-        particle_structure& particle = particles[k];
-        vec3& v = particle.v;
-        vec3& p = particle.p;
-        vec3 const& f = particle.f;
-
-        v = (1-0.9f*dt) * v + dt * f; // gravity + friction force
-        p = p + dt * v;
-    }
-
-    // Collisions with cube
     const float epsilon = 0.2f;
     const float mu = 0.5f;
     // Collisions between spheres
     for (size_t k = 0; k < N; ++k) {
-      particle_structure& particle_1 = particles[k];
-      vec3& v1 = particle_1.v;
-      vec3& p1 = particle_1.p;
-      float r1 = particle_1.r;
-      for (size_t j = 0; j < N; ++j) {
-        particle_structure& particle_2 = particles[j];
-        vec3& p2 = particle_2.p;
-        float r2 = particle_2.r;
-        if (j == k || norm(p1 - p2) > r1 + r2)
-          continue;
-        vec3& v2 = particle_2.v;
-        vec3 u = (p1 - p2) / norm(p1 - p2);
-        // Static contact
-        if (norm(v1 - v2) < epsilon) {
-          v1 = mu * v1;
-          v2 = mu * v2;
-        } else {
-          vec3 v1_orthogonal = dot(v1, u) * u;
-          vec3 v1_parallel = v1 - v1_orthogonal;
-          vec3 v2_orthogonal = dot(v2, u) * u;
-          vec3 v2_parallel = v2 - v2_orthogonal;
+        particle_structure& particle_1 = particles[k];
+        vec3& v1 = particle_1.v;
+        vec3& p1 = particle_1.p;
+        float r1 = particle_1.r;
+        for (size_t j = 0; j < N; ++j) {
+            particle_structure& particle_2 = particles[j];
+            vec3& p2 = particle_2.p;
+            float r2 = particle_2.r;
+            if (j == k || norm(p1 - p2) > r1 + r2)
+                continue;
+            vec3& v2 = particle_2.v;
+            vec3 u = (p1 - p2) / norm(p1 - p2);
+            // Static contact
+            if (norm(v1 - v2) < epsilon) {
+                v1 = mu * v1;
+                v2 = mu * v2;
+            } else {
+                vec3 v1_orthogonal = dot(v1, u) * u;
+                vec3 v1_parallel = v1 - v1_orthogonal;
+                vec3 v2_orthogonal = dot(v2, u) * u;
+                vec3 v2_parallel = v2 - v2_orthogonal;
 
-          v1 = alpha * v1_parallel + beta * v2_orthogonal;
-          v2 = alpha * v2_parallel + beta * v1_orthogonal;
+                v1 = partial_alpha * v1_parallel + partial_beta * v2_orthogonal;
+                v2 = partial_alpha * v2_parallel + partial_beta * v1_orthogonal;
+            }
+
+            float distance_penetration = r1 + r2 - norm(p1 - p2);
+            p1 += (distance_penetration / 2) * u;
+            p2 += (distance_penetration / 2) * -u;
+
         }
-
-        float distance_penetration = r1 + r2 - norm(p1 - p2);
-        p1 += (distance_penetration / 2) * u;
-        p2 += (distance_penetration / 2) * -u;
-
-      }
     }
-
-    std::vector<vec3> normals_cube = {{0,1,0}};
-    std::vector<vec3> points_cube = {{0,0,0}};
-    //buffer<vec3> points_cube = pool.position;
-//buffer<vec3> normals_cube = pool.normal;
 
     // Code to check intersection with finite object using aabb
     for (size_t k = 0; k < N; ++k) {
@@ -99,8 +83,7 @@ void scene_model::compute_time_step(float dt)
         vec3& v = particle.v;
         vec3& p = particle.p;
         float r = particle.r;
-        for (size_t j = 0; j < boundaries.size(); ++j) {
-            aabb box = boundaries[j];
+        for (auto box : boundaries) {
             float x = std::max(box.minX, std::min(p.x, box.maxX));
             float y = std::max(box.minY, std::min(p.y, box.maxY));
             float z = std::max(box.minZ, std::min(p.z, box.maxZ));
@@ -110,42 +93,35 @@ void scene_model::compute_time_step(float dt)
             if (distance <= r) {
                 vec3 v_orthogonal = dot(v, box.normal) * box.normal;
                 vec3 v_parallel = v - v_orthogonal;
-                v = alpha * v_parallel - beta * v_orthogonal;
+                v = partial_alpha * v_parallel - partial_beta * v_orthogonal;
 
                 p += box.normal * (r - dot(p - closest_point_aabb, box.normal));
             }
         }
-
-
     }
+}
 
-    // Code to check intersection with infinite plane
-    /*
-    size_t nb_faces_to_check = points_cube.size();
+void scene_model::compute_time_step(float dt, float partial_alpha, float partial_beta)
+{
+    // Set forces
+    const size_t N = particles.size();
+    for(size_t k=0; k<N; ++k)
+        particles[k].f = vec3(0,-9.81f,0);
+
+    // Integrate position and speed of particles through time
     for (size_t k = 0; k < N; ++k) {
-      particle_structure& particle = particles[k];
-      vec3& v = particle.v;
-      vec3& p = particle.p;
-      float r = particle.r;
-      for (size_t j = 0; j < nb_faces_to_check; ++j) {
-        vec3 a = points_cube[j];
-        vec3 n = normals_cube[j];
-        float detection = dot(p - a, n);
+        particle_structure& particle = particles[k];
+        vec3& v = particle.v;
+        vec3& p = particle.p;
+        vec3 const& f = particle.f;
 
-        if (detection <= r) {
-          vec3 v_orthogonal = dot(v, n) * n;
-          vec3 v_parallel = v - v_orthogonal;
-          v = alpha * v_parallel - beta * v_orthogonal;
-
-          p += n * (r - dot(p - a, n));
-        }
-      }
-
+        // TODO change this coefficient or remove it as we already have alpha and beta (why is it here ?)
+        // v = (1-0.9f*dt) * v + dt * f; // gravity + friction force
+        v += dt * f; // gravity + friction force
+        p = p + dt * v;
     }
-     */
 
-
-
+    check_collisions(partial_alpha, partial_beta);
 }
 
 void scene_model::white_ball_setup() {
@@ -156,6 +132,15 @@ void scene_model::white_ball_setup() {
     white_ball.p = vec3(0, 0, .8);
 
     particles.insert(particles.begin(), white_ball);
+
+    particle_structure black_ball;
+
+    black_ball.r = radius_ball;
+    black_ball.c = vec3(1, 1, 1);
+    black_ball.p = vec3(0, 0, .6);
+    black_ball.c = vec3(0,0,0);
+
+    particles.push_back(black_ball);
 }
 
 // Use this function to create the triangle and erase the balls still present in the scene
@@ -171,7 +156,7 @@ void scene_model::triangle_base_configuration() {
             particle_structure new_ball;
             new_ball.r = radius_ball;
             new_ball.c = color_lut[int(rand_interval()*color_lut.size())];
-            new_ball.p = vec3(diameter_ball * (j + i / 2.0f), 0.1f,  i * offset_z) + offset_triangle;
+            new_ball.p = vec3(diameter_ball * (j + i / 2.0f), 0.01f,  i * offset_z) + offset_triangle;
             particles.push_back(new_ball);
         }
     }
@@ -279,6 +264,8 @@ void scene_model::set_gui()
 {
     // Can set the speed of the animation
     ImGui::SliderFloat("Time scale", &timer.scale, 0.05f, 2.0f, "%.2f s");
+    ImGui::SliderInt("Number of collisions computations in one frame", &steps_in_frame, 1, 20);
+    ImGui::SliderFloat("Max launch speed", &max_speed, 5.0f, 15.f, "%.1f s");
     ImGui::SliderFloat("Friction", &alpha, .97f, .99f, "%.3f s");
     ImGui::SliderFloat("Impact", &beta, 0.97f, .99f, "%.3f s");
     ImGui::SliderInt("Score", &score, 0, 20);
@@ -385,7 +372,6 @@ void scene_model::mouse_click(scene_structure& scene, GLFWwindow* window, int , 
 
             particles[0].v = normalize(throw_dir) * distance * 5.f;
 
-            float max_speed = 10.f;
             float norm_speed = norm(particles[0].v);
             if (norm_speed > max_speed) {
                 particles[0].v = (particles[0].v / norm_speed) * max_speed;

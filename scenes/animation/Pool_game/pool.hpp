@@ -41,7 +41,9 @@ struct scene_model : scene_base
 
     void set_gui();
 
-    void compute_time_step(float dt);
+    void compute_time_step(float dt, float partial_alpha, float partial_beta);
+    void check_collisions(float partial_alpha, float partial_beta);
+
     void white_ball_setup();
     void triangle_base_configuration();
     void display_particles(scene_structure& scene);
@@ -72,6 +74,8 @@ struct scene_model : scene_base
 
     float radius_ball = 0.03f;
 
+    int steps_in_frame = 10;
+    float max_speed = 10.f;
     float alpha = .985f; // Restitution coefficient in parallel direction (friction)
     float beta = .985f; // Restitution coefficient in orthogonal direction (impact)
 
@@ -80,6 +84,7 @@ struct scene_model : scene_base
 
     bool is_throwing = false;
     vcl::vec3 throw_pos = vcl::vec3(0, 0, 0);
+
 };
 
 #endif
