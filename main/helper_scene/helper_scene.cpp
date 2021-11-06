@@ -54,6 +54,7 @@ void load_shaders(std::map<std::string,GLuint>& shaders)
     shaders["curve"] = create_shader_program("scenes/shared_assets/shaders/curve/shader.vert.glsl","scenes/shared_assets/shaders/curve/shader.frag.glsl");
     shaders["segment_im"] = create_shader_program("scenes/shared_assets/shaders/segment_immediate_mode/shader.vert.glsl","scenes/shared_assets/shaders/segment_immediate_mode/shader.frag.glsl");
     shaders["normals"] = create_shader_program("scenes/shared_assets/shaders/normals/shader.vert.glsl","scenes/shared_assets/shaders/normals/shader.geom.glsl","scenes/shared_assets/shaders/normals/shader.frag.glsl");
+    shaders["text"] = create_shader_program("scenes/shared_assets/shaders/text/shader.vert.glsl", "scenes/shared_assets/shaders/text/shader.frag.glsl");
 
     std::cout<<"\t [OK] Shader loaded"<<std::endl;
 }

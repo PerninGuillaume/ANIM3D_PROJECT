@@ -3,6 +3,8 @@ cmake_minimum_required(VERSION 2.8)
 project(pgm)
 
 add_definitions(-DIMGUI_IMPL_OPENGL_LOADER_GLAD)
+#add_subdirectory(./freetype-2.10.0/include/ft2build.h)
+find_package(Freetype REQUIRED)
 
 # Add G++ Warning on Unix
 if(UNIX)
@@ -32,11 +34,12 @@ file(
     scenes/*.[ch]pp
     scenes/*.glsl
     )
-add_executable(pgm ${source_files} scenes/animation/Pool_game/pool.cpp scenes/animation/Pool_game/pool.hpp)
+add_executable(pgm ${source_files} )
 
 
 if(UNIX)
-target_link_libraries(pgm glfw dl -static-libstdc++)
+target_link_libraries(pgm ${FREETYPE_LIBRARIES} glfw dl -static-libstdc++)
+target_include_directories(pgm PRIVATE ${FREETYPE_INCLUDE_DIRS})
 endif()
 
 if(WIN32)

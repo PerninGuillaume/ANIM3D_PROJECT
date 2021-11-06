@@ -1,6 +1,7 @@
 #pragma once
 
 #include "main/scene_base/base.hpp"
+#include "textRender.hpp"
 
 #ifdef POOL_GAME
 
@@ -35,7 +36,7 @@ struct gui_scene_structure
 
 struct animation_camera
 {
-    float time_animation_begin;
+    float time_animation_begin = 0.0f;
     float animation_duration = 1.0f;
 
     float theta_begin;
@@ -58,6 +59,7 @@ struct scene_model : scene_base
 {
     void setup_data(std::map<std::string,GLuint>& shaders, scene_structure& scene, gui_structure& gui);
     void setup_aabb(std::map<std::string, GLuint>& shaders);
+    void draw_objects(scene_structure& scene);
     void frame_draw(std::map<std::string,GLuint>& shaders, scene_structure& scene, gui_structure& gui);
 
     void set_gui();
@@ -103,11 +105,13 @@ struct scene_model : scene_base
 
     int score = 0;
     bool play_allowed = true;
+    bool in_animation = true;
     animation_camera animationCamera;
 
     bool is_throwing = false;
     vcl::vec3 throw_pos = vcl::vec3(0, 0, 0);
 
+    textRender textRenderer;
 };
 
 #endif

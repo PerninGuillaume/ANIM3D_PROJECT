@@ -9,13 +9,28 @@ using namespace vcl;
 static float linear_interpolation(float t, float t_final, const float angle1, const float angle2);
 static vec3 linear_interpolation(float t, float t_final, const vec3 p1, const vec3 p2);
 
-void scene_model::frame_draw(std::map<std::string,GLuint>& , scene_structure& scene, gui_structure& )
+void scene_model::draw_objects(scene_structure& scene) {
+    display_particles(scene);
+    draw(borders, scene.camera);
+    textRenderer.renderText("Score : " + std::to_string(score), 1550.0f, 950.0f, 1.0f, vec3(0.0, 0.0, 0.0));
+    // TODO the balls appear black when we render the text before the balls (possible issue with texture afterwards)
+}
+
+void scene_model::frame_draw(std::map<std::string,GLuint>& shaders, scene_structure& scene, gui_structure& )
 {
     float dt = 0.02f * timer.scale;
     timer.update();
+    float t = timer.t;
+    in_animation = t - animationCamera.time_animation_begin < animationCamera.animation_duration;
 
     set_gui();
 
+    if (in_animation) {
+        animationCamera.update_camera(scene, animationCamera.interpolate_reference_position(t),
+                                      animationCamera.interpolate_camera_position(t));
+        draw_objects(scene);
+        return;
+    }
 
     float partial_alpha = std::pow(alpha, 1.0/steps_in_frame);
     float partial_beta = std::pow(beta, 1.0/steps_in_frame);
@@ -24,9 +39,7 @@ void scene_model::frame_draw(std::map<std::string,GLuint>& , scene_structure& sc
     }
     //compute_time_step(dt);
 
-    display_particles(scene);
-    //draw(ground, scene.camera);
-    draw(borders, scene.camera);
+    draw_objects(scene);
 
     if (check_state() && !play_allowed) // We enter here on the frame the action finishes
     {
@@ -43,9 +56,6 @@ void scene_model::frame_draw(std::map<std::string,GLuint>& , scene_structure& sc
 
     }
 
-    float t = timer.t;
-    if (t - animationCamera.time_animation_begin < animationCamera.animation_duration)
-        animationCamera.update_camera(scene, animationCamera.interpolate_reference_position(t), animationCamera.interpolate_camera_position(t));
 
     check_score();
     check_white_ball();
@@ -272,6 +282,7 @@ void scene_model::setup_aabb(std::map<std::string, GLuint>& shaders) {
 
 void scene_model::setup_data(std::map<std::string,GLuint>& shaders, scene_structure& scene, gui_structure& )
 {
+    textRenderer.setup_font(shaders);
     setup_aabb(shaders);
     triangle_base_configuration();
     white_ball_setup();
@@ -368,7 +379,7 @@ void scene_model::mouse_click(scene_structure& scene, GLFWwindow* window, int , 
     const bool mouse_released_left = glfw_mouse_released_left(window);
 
     // Check if shift key is pressed
-    if (mouse_click_left && play_allowed)
+    if (mouse_click_left && play_allowed && !in_animation)
     {
         // Create the 3D ray passing by the selected point on the screen
         const ray r = picking_ray(scene.camera, cursor);
@@ -385,7 +396,7 @@ void scene_model::mouse_click(scene_structure& scene, GLFWwindow* window, int , 
         }
     }
 
-    else if (mouse_released_left && play_allowed && is_throwing) {
+    else if (mouse_released_left && play_allowed && is_throwing && !in_animation) {
         // Create the 3D ray passing by the selected point on the screen
         const ray r = picking_ray(scene.camera, cursor);
 
