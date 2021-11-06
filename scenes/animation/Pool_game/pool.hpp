@@ -7,7 +7,7 @@
 
 struct aabb
 {
-    aabb(float minX, float maxX, float minY, float maxY, float minZ, float maxZ, vcl::vec3 normal);
+    aabb(float minX, float maxX, float minY, float maxY, float minZ, float maxZ, vcl::vec3 normal, bool bouncing);
     float minX;
     float maxX;
     float minY;
@@ -15,6 +15,7 @@ struct aabb
     float minZ;
     float maxZ;
     vcl::vec3 normal;
+    bool bouncing;
 };
 
 // Structure of a particle
@@ -99,13 +100,14 @@ struct scene_model : scene_base
     vcl::vec3 white_ball_position = vcl::vec3{0,0,0.8};
 
     int steps_in_frame = 10;
-    float max_speed = 10.f;
+    float max_speed = 7.5f;
     float alpha = .985f; // Restitution coefficient in parallel direction (friction)
     float beta = .985f; // Restitution coefficient in orthogonal direction (impact)
 
     int score = 0;
     bool play_allowed = true;
     bool in_animation = true;
+    bool animateCamera = true;
     animation_camera animationCamera;
 
     bool is_throwing = false;

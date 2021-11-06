@@ -136,6 +136,7 @@ void mouse_click_callback(GLFWwindow* window, int button, int action, int mods)
 void mouse_scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 {
     scene_current.mouse_scroll(scene, window, float(xoffset), float(yoffset));
+    scene.camera.apply_scaling(-float(yoffset) / 10.f);
 }
 void keyboard_input_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {

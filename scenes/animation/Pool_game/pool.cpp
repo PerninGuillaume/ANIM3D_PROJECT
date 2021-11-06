@@ -21,7 +21,7 @@ void scene_model::frame_draw(std::map<std::string,GLuint>& shaders, scene_struct
     float dt = 0.02f * timer.scale;
     timer.update();
     float t = timer.t;
-    in_animation = t - animationCamera.time_animation_begin < animationCamera.animation_duration;
+    in_animation = animateCamera && (t - animationCamera.time_animation_begin < animationCamera.animation_duration);
 
     set_gui();
 
@@ -53,6 +53,9 @@ void scene_model::frame_draw(std::map<std::string,GLuint>& shaders, scene_struct
         animationCamera.p_begin = animationCamera.p_save;
         animationCamera.p_end = -particles[0].p;
         animationCamera.p_save = -particles[0].p;
+        if (!animateCamera)
+            animationCamera.update_camera(scene, animationCamera.p_end, vec2{animationCamera.theta_begin, animationCamera.phi_begin});
+
 
     }
 
@@ -130,7 +133,10 @@ void scene_model::check_collisions(float partial_alpha, float partial_beta) {
             if (distance <= r) {
                 vec3 v_orthogonal = dot(v, box.normal) * box.normal;
                 vec3 v_parallel = v - v_orthogonal;
+
                 v = partial_alpha * v_parallel - partial_beta * v_orthogonal;
+                if (!box.bouncing)
+                    v *= 0.1f; // Prevent balls touching the inside of one hole and bouncing back
 
                 p += box.normal * (r - dot(p - closest_point_aabb, box.normal));
             }
@@ -155,6 +161,8 @@ void scene_model::compute_time_step(float dt, float partial_alpha, float partial
         // TODO change this coefficient or remove it as we already have alpha and beta (why is it here ?)
         // v = (1-0.9f*dt) * v + dt * f; // gravity + friction force
         v += dt * f; // gravity + friction force
+        if (v.y > 0)
+            v.y *= 0.98f; // prevent bouncing balls
         p = p + dt * v;
     }
 
@@ -244,30 +252,30 @@ void scene_model::setup_aabb(std::map<std::string, GLuint>& shaders) {
     float z_ground = 1.27;
     float width_border = 0.1f;
     float height_border = 0.2f;
-    float size_hole = 0.1f;
+    float size_hole = 0.12f;
     float corner_hole_bias = 0.1f;
     float width_hole_side = 0.01f;
 
     // A pool table is symmetric along its z and x axis so we don't need to specify all corners
-    std::vector<aabb> corners = {{x_ground - width_hole_side, x_ground, 0, height_border, 0, size_hole / 2.0f, {-1, 0, 0}},
-                                 {x_ground - width_border, x_ground - width_hole_side, 0, height_border, size_hole / 2.0f, size_hole / 2.0f, {0, 0, 1}},
-                                 {x_ground - width_border, x_ground, 0, height_border, size_hole / 2.0f, z_ground - width_border - corner_hole_bias, {-1, 0, 0}},
-                                 {x_ground - width_hole_side, x_ground, 0, height_border, z_ground - width_border - corner_hole_bias, z_ground - width_hole_side, {-1, 0, 0}},
-                                 {x_ground - width_border - corner_hole_bias, x_ground - width_hole_side, 0, height_border, z_ground - width_hole_side, z_ground, {0, 0, -1}},
-                                 {0, x_ground - width_border - corner_hole_bias, 0, height_border, z_ground - width_border, z_ground, {0, 0, -1}}};
+    std::vector<aabb> corners = {{x_ground - width_hole_side, x_ground, 0, height_border, 0, size_hole / 2.0f, {-1, 0, 0}, false},
+                                 //{x_ground - width_border, x_ground - width_hole_side, 0, height_border, size_hole / 2.0f, size_hole / 2.0f, {0, 0, -1}, false},
+                                 {x_ground - width_border, x_ground - width_border + 0.01f, 0, height_border, size_hole / 2.0f, z_ground - width_border - corner_hole_bias, {-1, 0, 0}, true},
+                                 {x_ground - width_hole_side, x_ground, 0, height_border, z_ground - width_border - corner_hole_bias, z_ground - width_hole_side, {-1, 0, 0}, false},
+                                 {x_ground - width_border - corner_hole_bias, x_ground - width_hole_side, 0, height_border, z_ground - width_hole_side, z_ground, {0, 0, -1}, false},
+                                 {0, x_ground - width_border - corner_hole_bias, 0, height_border, z_ground - width_border, z_ground, {0, 0, -1}, true}};
 
     for (int symmetric_x = -1; symmetric_x <= 1; symmetric_x += 2) {
         for (int symmetric_z = -1; symmetric_z <= 1; symmetric_z += 2) {
-            for (auto corner : corners) {
+            for (size_t i = 0; i < corners.size(); ++i) {
+                aabb& corner = corners[i];
                 vec3 normal = vec3(corner.normal.x * symmetric_x, corner.normal.y, corner.normal.z * symmetric_z);
-                boundaries.emplace_back(corner.minX * symmetric_x, corner.maxX * symmetric_x, corner.minY, corner.maxY, corner.minZ * symmetric_z, corner.maxZ * symmetric_z, normal);
+                boundaries.emplace_back(corner.minX * symmetric_x, corner.maxX * symmetric_x, corner.minY, corner.maxY, corner.minZ * symmetric_z, corner.maxZ * symmetric_z, normal, corner.bouncing);
             }
         }
     }
 
-    boundaries.push_back({-x_ground + width_border, x_ground - width_border, 0, 0, -z_ground + width_border, z_ground - width_border, {0,1,0}});
+    boundaries.push_back({-x_ground + width_border, x_ground - width_border, -0.2, 0, -z_ground + width_border, z_ground - width_border, {0,1,0}, true});
     float height_under_ground = -1.0f;
-    boundaries.push_back({-10.0f, 10.0f, height_under_ground, height_under_ground - 1.0f, -10.0f, 10.0f, {0,1,0}});
 
     ground = mesh_drawable(mesh_primitive_quad({-x_ground + width_border,0,-z_ground + width_border}, {x_ground - width_border,0,-z_ground + width_border}, {x_ground - width_border,0,z_ground - width_border}, {-x_ground + width_border,0,z_ground - width_border}));
 
@@ -308,10 +316,11 @@ void scene_model::set_gui()
         triangle_base_configuration();
         white_ball_setup();
     }
+    ImGui::Checkbox("Animate camera", &animateCamera);
     ImGui::SliderFloat("Time scale", &timer.scale, 0.05f, 2.0f, "%.2f s");
     ImGui::SliderFloat("Camera animation time duration", &animationCamera.animation_duration, 0.2f, 5.0f, "%.2f s");
     ImGui::SliderInt("Number of collisions computations in one frame", &steps_in_frame, 1, 20);
-    ImGui::SliderFloat("Max launch speed", &max_speed, 5.0f, 15.f, "%.1f s");
+    ImGui::SliderFloat("Max launch speed", &max_speed, 1.0f, 15.f, "%.1f");
     ImGui::SliderFloat("Friction", &alpha, .97f, .99f, "%.3f s");
     ImGui::SliderFloat("Impact", &beta, 0.97f, .99f, "%.3f s");
     ImGui::SliderInt("Score", &score, 0, 20);
@@ -323,7 +332,7 @@ void scene_model::set_gui()
     if(start_anim) timer.start();
 }
 
-aabb::aabb(float minX, float maxX, float minY, float maxY, float minZ, float maxZ, vcl::vec3 normal) {
+aabb::aabb(float minX, float maxX, float minY, float maxY, float minZ, float maxZ, vcl::vec3 normal, bool bouncing) {
     if (minX <= maxX) {
         this->minX = minX;
         this->maxX = maxX;
@@ -346,6 +355,7 @@ aabb::aabb(float minX, float maxX, float minY, float maxY, float minZ, float max
         this->maxZ = minZ;
     }
     this->normal = normalize(normal);
+    this->bouncing = bouncing;
 }
 
 bool intersectPlane(const vec3 &n, const vec3 &p0, const ray r, vec3& p)
