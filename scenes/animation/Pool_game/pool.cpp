@@ -13,7 +13,8 @@ void scene_model::frame_draw(std::map<std::string,GLuint>& , scene_structure& sc
 
     set_gui();
 
-    float partial_dt = dt / steps_in_frame;
+    scene.camera.camera_type = camera_control_spherical_coordinates;
+
     float partial_alpha = std::pow(alpha, 1.0/steps_in_frame);
     float partial_beta = std::pow(beta, 1.0/steps_in_frame);
     for (int i = 0; i < steps_in_frame; ++i) {
@@ -25,9 +26,8 @@ void scene_model::frame_draw(std::map<std::string,GLuint>& , scene_structure& sc
     //draw(ground, scene.camera);
     draw(borders, scene.camera);
 
-    play_allowed = check_state();
-
-    if (play_allowed) {
+    if (check_state() && !play_allowed) {
+        play_allowed = true;
         update_camera(scene);
     }
 
@@ -40,7 +40,7 @@ void scene_model::frame_draw(std::map<std::string,GLuint>& , scene_structure& sc
 
 void scene_model::check_collisions(float partial_alpha, float partial_beta) {
     const size_t N = particles.size();
-    const float epsilon = 0.2f;
+    const float epsilon = 0.0f;
     const float mu = 0.5f;
     // Collisions between spheres
     for (size_t k = 0; k < N; ++k) {
@@ -362,6 +362,7 @@ void scene_model::mouse_click(scene_structure& scene, GLFWwindow* window, int , 
 
         if (intersectPlane(n, p0, r, p)) {
             is_throwing = false;
+            play_allowed = false;
 
             vec3 throw_dir = normalize(throw_pos - particles[0].p);
             float distance = dot(-throw_dir, p - throw_pos);
@@ -415,6 +416,17 @@ bool scene_model::check_state()
 
 void scene_model::update_camera(scene_structure& scene) {
     scene.camera.translation = -particles[0].p;
+    scene.camera.spherical_coordinates.y = -0.45; // In radians
+
+    // Trigonometry magic using the dot product to find the angle we need
+    vec2 toward_center = vec2(-particles[0].p.x, -particles[0].p.z);
+    vec2 z = vec2(0, -1);
+    float angle = std::acos(dot(toward_center, z) / (norm(toward_center) * norm(z)));
+    if (particles[0].p.x < 0)
+        angle = -angle; // Need to inverse the angle if we are on one half of the board
+    scene.camera.spherical_coordinates.x = angle;
+
+    scene.camera.apply_rotation(0,0,0,0); // To make our changes to spherical coordinates update
 }
 
 #endif

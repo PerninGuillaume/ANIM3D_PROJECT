@@ -135,11 +135,11 @@ void camera_scene::apply_rotation(float x0, float y0, float x1, float y1)
                           0,std::cos(phi), -std::sin(phi),
                           0,std::sin(phi),  std::cos(phi)};
 
-        const mat3 Rz = { std::cos(theta) , -std::sin(theta) , 0,
-                          std::sin(theta) ,  std::cos(theta) , 0,
-                          0             ,      0         , 1};
+        const mat3 Ry = { std::cos(theta) , 0 , std::sin(theta),
+                          0 ,  1 , 0,
+                          -std::sin(theta) ,0 , std::cos(theta)};
 
-        orientation = Rz*Rx;
+        orientation = Ry*Rx;
     }
     else if (camera_type == camera_control_trackball )
     {
