@@ -33,6 +33,27 @@ struct gui_scene_structure
     float time_interval_new_sphere = 0.5f;
 };
 
+struct animation_camera
+{
+    float time_animation_begin;
+    float animation_duration = 1.0f;
+
+    float theta_begin;
+    float phi_begin;
+    float theta_end;
+    float phi_end = -0.45;
+
+    vcl::vec3 p_save;
+    vcl::vec3 p_begin;
+    vcl::vec3 p_end = vcl::vec3{0, 0, -0.8};
+
+    vcl::vec2 interpolate_camera_position(float t) const;
+
+    vcl::vec3 interpolate_reference_position(float t) const;
+    static float angle_between_center_and_point(const vcl::vec3 &point);
+    void update_camera(scene_structure& scene, vcl::vec3 position, vcl::vec2 spherical_coordinates);
+};
+
 struct scene_model : scene_base
 {
     void setup_data(std::map<std::string,GLuint>& shaders, scene_structure& scene, gui_structure& gui);
@@ -54,7 +75,6 @@ struct scene_model : scene_base
     void check_score();
     void check_white_ball();
 
-    void update_camera(scene_structure& scene);
 
     // Textures
     GLuint texture_green;
@@ -72,7 +92,9 @@ struct scene_model : scene_base
     vcl::timer_event timer;
     gui_scene_structure gui_scene;
 
+    bool reset = false;
     float radius_ball = 0.03f;
+    vcl::vec3 white_ball_position = vcl::vec3{0,0,0.8};
 
     int steps_in_frame = 10;
     float max_speed = 10.f;
@@ -81,6 +103,7 @@ struct scene_model : scene_base
 
     int score = 0;
     bool play_allowed = true;
+    animation_camera animationCamera;
 
     bool is_throwing = false;
     vcl::vec3 throw_pos = vcl::vec3(0, 0, 0);

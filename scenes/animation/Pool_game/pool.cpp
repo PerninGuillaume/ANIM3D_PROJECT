@@ -6,6 +6,9 @@
 
 using namespace vcl;
 
+static float linear_interpolation(float t, float t_final, const float angle1, const float angle2);
+static vec3 linear_interpolation(float t, float t_final, const vec3 p1, const vec3 p2);
+
 void scene_model::frame_draw(std::map<std::string,GLuint>& , scene_structure& scene, gui_structure& )
 {
     float dt = 0.02f * timer.scale;
@@ -13,7 +16,6 @@ void scene_model::frame_draw(std::map<std::string,GLuint>& , scene_structure& sc
 
     set_gui();
 
-    scene.camera.camera_type = camera_control_spherical_coordinates;
 
     float partial_alpha = std::pow(alpha, 1.0/steps_in_frame);
     float partial_beta = std::pow(beta, 1.0/steps_in_frame);
@@ -26,16 +28,41 @@ void scene_model::frame_draw(std::map<std::string,GLuint>& , scene_structure& sc
     //draw(ground, scene.camera);
     draw(borders, scene.camera);
 
-    if (check_state() && !play_allowed) {
+    if (check_state() && !play_allowed) // We enter here on the frame the action finishes
+    {
         play_allowed = true;
-        update_camera(scene);
+        animationCamera.time_animation_begin = timer.t;
+
+        animationCamera.theta_begin = scene.camera.spherical_coordinates.x;
+        animationCamera.phi_begin = scene.camera.spherical_coordinates.y;
+        animationCamera.theta_end = animation_camera::angle_between_center_and_point(particles[0].p);
+
+        animationCamera.p_begin = animationCamera.p_save;
+        animationCamera.p_end = -particles[0].p;
+        animationCamera.p_save = -particles[0].p;
+
     }
+
+    float t = timer.t;
+    if (t - animationCamera.time_animation_begin < animationCamera.animation_duration)
+        animationCamera.update_camera(scene, animationCamera.interpolate_reference_position(t), animationCamera.interpolate_camera_position(t));
 
     check_score();
     check_white_ball();
 
     //draw(pool_visual, scene.camera);
     //glBindTexture(GL_TEXTURE_2D, scene.texture_white);
+}
+
+vcl::vec2 animation_camera::interpolate_camera_position(float t) const {
+    float theta_intermediate = linear_interpolation(t - time_animation_begin, animation_duration, theta_begin, theta_end);
+    float phi_intermediate = linear_interpolation(t - time_animation_begin, animation_duration, phi_begin, phi_end);
+    return {theta_intermediate, phi_intermediate};
+}
+
+vcl::vec3 animation_camera::interpolate_reference_position(float t) const {
+    vec3 p = linear_interpolation(t - time_animation_begin, animation_duration, p_begin, p_end);
+    return p;
 }
 
 void scene_model::check_collisions(float partial_alpha, float partial_beta) {
@@ -129,7 +156,7 @@ void scene_model::white_ball_setup() {
 
     white_ball.r = radius_ball;
     white_ball.c = vec3(1, 1, 1);
-    white_ball.p = vec3(0, 0, .8);
+    white_ball.p = white_ball_position;
 
     particles.insert(particles.begin(), white_ball);
 
@@ -243,11 +270,13 @@ void scene_model::setup_aabb(std::map<std::string, GLuint>& shaders) {
     // ground.texture_id = texture_green;
 }
 
-void scene_model::setup_data(std::map<std::string,GLuint>& shaders, scene_structure& , gui_structure& )
+void scene_model::setup_data(std::map<std::string,GLuint>& shaders, scene_structure& scene, gui_structure& )
 {
     setup_aabb(shaders);
     triangle_base_configuration();
     white_ball_setup();
+    scene.camera.camera_type = camera_control_spherical_coordinates;
+    animationCamera.update_camera(scene, -white_ball_position, vec2(0,0));
 
     // texture_wood  = create_texture_gpu(image_load_png("scenes/animation/02_simulation/assets/wood.png"));
     // texture_green = create_texture_gpu(image_load_png("scenes/animation/Pool_game/assets/green.png"));
@@ -263,7 +292,13 @@ void scene_model::setup_data(std::map<std::string,GLuint>& shaders, scene_struct
 void scene_model::set_gui()
 {
     // Can set the speed of the animation
+    if (ImGui::Checkbox("Reset Pool Board", &reset)) {
+        reset = false;
+        triangle_base_configuration();
+        white_ball_setup();
+    }
     ImGui::SliderFloat("Time scale", &timer.scale, 0.05f, 2.0f, "%.2f s");
+    ImGui::SliderFloat("Camera animation time duration", &animationCamera.animation_duration, 0.2f, 5.0f, "%.2f s");
     ImGui::SliderInt("Number of collisions computations in one frame", &steps_in_frame, 1, 20);
     ImGui::SliderFloat("Max launch speed", &max_speed, 5.0f, 15.f, "%.1f s");
     ImGui::SliderFloat("Friction", &alpha, .97f, .99f, "%.3f s");
@@ -333,7 +368,7 @@ void scene_model::mouse_click(scene_structure& scene, GLFWwindow* window, int , 
     const bool mouse_released_left = glfw_mouse_released_left(window);
 
     // Check if shift key is pressed
-    if(mouse_click_left && play_allowed)
+    if (mouse_click_left && play_allowed)
     {
         // Create the 3D ray passing by the selected point on the screen
         const ray r = picking_ray(scene.camera, cursor);
@@ -398,7 +433,7 @@ void scene_model::check_score()
 void scene_model::check_white_ball()
 {
     if (particles[0].p.y <= -.2f) {
-        particles[0].p = vec3(0, 0, .8);
+        particles[0].p = white_ball_position;
         particles[0].v = vec3(0, 0, 0);
     }
 }
@@ -414,17 +449,36 @@ bool scene_model::check_state()
     return true;
 }
 
-void scene_model::update_camera(scene_structure& scene) {
-    scene.camera.translation = -particles[0].p;
-    scene.camera.spherical_coordinates.y = -0.45; // In radians
+static float linear_interpolation(float t, float t_final, const float angle1, const float angle2)
+{
+    const float alpha = (t)/(t_final); //percentage of advancement in the current line, from 0 to 1
+    float angle = (1-alpha)*angle1 + alpha*angle2;
 
+    return angle;
+}
+
+static vec3 linear_interpolation(float t, float t_final, const vec3 p1, const vec3 p2)
+{
+    const float alpha = (t)/(t_final); //percentage of advancement in the current line, from 0 to 1
+    vec3 p = (1-alpha)*p1 + alpha*p2;
+
+    return p;
+}
+
+float animation_camera::angle_between_center_and_point(const vec3& point) {
     // Trigonometry magic using the dot product to find the angle we need
-    vec2 toward_center = vec2(-particles[0].p.x, -particles[0].p.z);
+    vec2 toward_center = vec2(-point.x, -point.z);
     vec2 z = vec2(0, -1);
     float angle = std::acos(dot(toward_center, z) / (norm(toward_center) * norm(z)));
-    if (particles[0].p.x < 0)
+    if (point.x < 0)
         angle = -angle; // Need to inverse the angle if we are on one half of the board
-    scene.camera.spherical_coordinates.x = angle;
+    return angle;
+}
+
+void animation_camera::update_camera(scene_structure& scene, vec3 position, vec2 spherical_coordinates) {
+    scene.camera.translation = position;//-particles[0].p;
+    scene.camera.spherical_coordinates.x = spherical_coordinates.x;//-0.45; // In radians
+    scene.camera.spherical_coordinates.y = spherical_coordinates.y;;
 
     scene.camera.apply_rotation(0,0,0,0); // To make our changes to spherical coordinates update
 }
