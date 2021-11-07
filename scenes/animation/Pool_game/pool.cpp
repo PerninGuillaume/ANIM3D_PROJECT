@@ -33,9 +33,12 @@ void print_end_game(textRender& textRenderer, unsigned int nb_shots) {
     textRenderer.renderText(message, 700.0f, 500.0f, 1.0f, vec3(0.0, 0.0, 0.0));
 }
 
-void scene_model::draw_objects(scene_structure& scene) {
+void scene_model::draw_objects(std::map<std::string,GLuint>& shaders, scene_structure& scene) {
     display_particles(scene);
+
     draw(borders, scene.camera);
+    draw_cue(shaders, scene);
+
     if (gameFinished)
         print_end_game(textRenderer, nb_shots);
     else
@@ -43,8 +46,7 @@ void scene_model::draw_objects(scene_structure& scene) {
 
 }
 
-void scene_model::frame_draw(std::map<std::string,GLuint>&, scene_structure& scene, gui_structure& )
-{
+void scene_model::frame_draw(std::map<std::string,GLuint>& shaders, scene_structure& scene, gui_structure& ) {
     float dt = 0.02f * timer.scale;
     timer.update();
     float t = timer.t;
@@ -55,7 +57,7 @@ void scene_model::frame_draw(std::map<std::string,GLuint>&, scene_structure& sce
     if (in_animation) {
         animation_camera::update_camera(scene, animationCamera.interpolate_reference_position(t),
                                       animationCamera.interpolate_camera_position(t));
-        draw_objects(scene);
+        draw_objects(shaders, scene);
         return;
     }
 
@@ -66,7 +68,7 @@ void scene_model::frame_draw(std::map<std::string,GLuint>&, scene_structure& sce
     }
     //compute_time_step(dt);
 
-    draw_objects(scene);
+    draw_objects(shaders, scene);
 
     if (check_state() && !play_allowed) // We enter here on the frame the action finishes
     {
@@ -82,10 +84,7 @@ void scene_model::frame_draw(std::map<std::string,GLuint>&, scene_structure& sce
         animationCamera.p_save = -particles[0].p;
         if (!animateCamera)
             animation_camera::update_camera(scene, animationCamera.p_end, vec2{animationCamera.theta_begin, animationCamera.phi_begin});
-
-
     }
-
 
     check_score();
     check_white_ball();
@@ -135,6 +134,7 @@ void scene_model::check_collisions(float partial_alpha, float partial_beta) {
     const size_t N = particles.size();
     const float epsilon = 0.0f;
     const float mu = 0.5f;
+
     // Collisions between spheres
     for (size_t k = 0; k < N; ++k) {
         particle_structure& particle_1 = particles[k];
@@ -200,8 +200,7 @@ void scene_model::check_collisions(float partial_alpha, float partial_beta) {
     }
 }
 
-void scene_model::compute_time_step(float dt, float partial_alpha, float partial_beta)
-{
+void scene_model::compute_time_step(float dt, float partial_alpha, float partial_beta) {
     // Set forces
     const size_t N = particles.size();
     for(size_t k=0; k<N; ++k)
@@ -256,8 +255,7 @@ void scene_model::triangle_base_configuration() {
     }
 }
 
-void scene_model::display_particles(scene_structure& scene)
-{
+void scene_model::display_particles(scene_structure& scene) {
     const size_t N = particles.size();
     for(size_t k=0; k<N; ++k)
     {
@@ -334,8 +332,7 @@ void scene_model::setup_aabb(std::map<std::string, GLuint>& shaders) {
     // ground.texture_id = texture_green;
 }
 
-void scene_model::setup_data(std::map<std::string,GLuint>& shaders, scene_structure& scene, gui_structure& )
-{
+void scene_model::setup_data(std::map<std::string,GLuint>& shaders, scene_structure& scene, gui_structure& ) {
     textRenderer.setup_font(shaders);
     setup_aabb(shaders);
     triangle_base_configuration();
@@ -354,8 +351,7 @@ void scene_model::setup_data(std::map<std::string,GLuint>& shaders, scene_struct
     // pool_visual.texture_id = texture_wood;
 }
 
-void scene_model::set_gui()
-{
+void scene_model::set_gui() {
     // Can set the speed of the animation
     if (ImGui::Checkbox("Reset Pool Board", &reset)) {
         reset = false;
@@ -406,8 +402,7 @@ aabb::aabb(float minX, float maxX, float minY, float maxY, float minZ, float max
     this->bouncing = bouncing;
 }
 
-bool intersectPlane(const vec3 &n, const vec3 &p0, const ray r, vec3& p)
-{
+bool intersectPlane(const vec3 &n, const vec3 &p0, const ray r, vec3& p) {
     // assuming vectors are all normalized
     float denom = dot(n, r.u);
 
@@ -424,8 +419,7 @@ bool intersectPlane(const vec3 &n, const vec3 &p0, const ray r, vec3& p)
     return false;
 }
 
-void scene_model::mouse_click(scene_structure& scene, GLFWwindow* window, int , int , int )
-{
+void scene_model::mouse_click(scene_structure& scene, GLFWwindow* window, int , int , int ) {
     // Mouse click is used to select a position of the control polygon
     // ******************************************************************** //
 
@@ -433,12 +427,11 @@ void scene_model::mouse_click(scene_structure& scene, GLFWwindow* window, int , 
     const vec2 cursor = glfw_cursor_coordinates_window(window);
 
     // Check that the mouse is clicked (drag and drop)
-    const bool mouse_click_left  = glfw_mouse_pressed_left(window);
+    const bool mouse_click_left = glfw_mouse_pressed_left(window);
     const bool mouse_released_left = glfw_mouse_released_left(window);
 
     // Check if shift key is pressed
-    if (mouse_click_left && play_allowed && !in_animation)
-    {
+    if (mouse_click_left && play_allowed && !in_animation) {
         // Create the 3D ray passing by the selected point on the screen
         const ray r = picking_ray(scene.camera, cursor);
 
@@ -450,11 +443,33 @@ void scene_model::mouse_click(scene_structure& scene, GLFWwindow* window, int , 
 
         if (intersectPlane(n, p0, r, p)) {
             throw_pos = p;
+            throw_dir = normalize(throw_pos - particles[0].p);
             is_throwing = true;
         }
     }
 
     else if (mouse_released_left && play_allowed && is_throwing && !in_animation) {
+        is_throwing = false;
+        play_allowed = false;
+        ++nb_shots;
+
+        particles[0].v = throw_dir * distance * 5.f;
+
+        float norm_speed = norm(particles[0].v);
+        if (norm_speed > max_speed) {
+            particles[0].v = (particles[0].v / norm_speed) * max_speed;
+        }
+
+        particles[0].v.y = 0;
+        distance = 0;
+    }
+}
+
+void scene_model::mouse_move(scene_structure& scene, GLFWwindow* window) {
+    if (is_throwing) {
+        // Cursor coordinates
+        const vec2 cursor = glfw_cursor_coordinates_window(window);
+
         // Create the 3D ray passing by the selected point on the screen
         const ray r = picking_ray(scene.camera, cursor);
 
@@ -465,31 +480,14 @@ void scene_model::mouse_click(scene_structure& scene, GLFWwindow* window, int , 
         vec3 p;
 
         if (intersectPlane(n, p0, r, p)) {
-            is_throwing = false;
+            distance = dot(-throw_dir, p - throw_pos);
 
-            vec3 throw_dir = normalize(throw_pos - particles[0].p);
-            float distance = dot(-throw_dir, p - throw_pos);
-
-            if (distance <= 0) {
-                return;
-            }
-            play_allowed = false;
-            ++nb_shots;
-
-            particles[0].v = normalize(throw_dir) * distance * 5.f;
-
-            float norm_speed = norm(particles[0].v);
-            if (norm_speed > max_speed) {
-                particles[0].v = (particles[0].v / norm_speed) * max_speed;
-            }
-
-            particles[0].v.y = 0;
+            distance = std::max(0.f, distance);
         }
     }
 }
 
-void scene_model::check_score()
-{
+void scene_model::check_score() {
     for (size_t i = 1; i < particles.size(); ++i)
     {
         if (particles[i].p.y <= -.2f) {
@@ -500,8 +498,7 @@ void scene_model::check_score()
     }
 }
 
-void scene_model::check_white_ball()
-{
+void scene_model::check_white_ball() {
     if (particles[0].p.y <= -.2f) {
         particles[0].p = white_ball_position;
         particles[0].v = vec3(0, 0, 0);
@@ -515,8 +512,7 @@ void scene_model::check_end_game() {
     }
 }
 
-bool scene_model::check_state()
-{
+bool scene_model::check_state() {
     for (const auto& particle: particles) {
         if (fabs(particle.v.x) > 1e-2 || fabs(particle.v.z) > 1e-2) {
             return false;
@@ -526,16 +522,14 @@ bool scene_model::check_state()
     return true;
 }
 
-static float linear_interpolation(float t, float t_final, const float angle1, const float angle2)
-{
+static float linear_interpolation(float t, float t_final, const float angle1, const float angle2) {
     const float alpha = (t)/(t_final); //percentage of advancement in the current line, from 0 to 1
     float angle = (1-alpha)*angle1 + alpha*angle2;
 
     return angle;
 }
 
-static vec3 linear_interpolation(float t, float t_final, const vec3 p1, const vec3 p2)
-{
+static vec3 linear_interpolation(float t, float t_final, const vec3 p1, const vec3 p2) {
     const float alpha = (t)/(t_final); //percentage of advancement in the current line, from 0 to 1
     vec3 p = (1-alpha)*p1 + alpha*p2;
 
@@ -558,6 +552,26 @@ void animation_camera::update_camera(scene_structure& scene, vec3 position, vec2
     scene.camera.spherical_coordinates.y = spherical_coordinates.y;;
 
     scene.camera.apply_rotation(0,0,0,0); // To make our changes to spherical coordinates update
+}
+
+void scene_model::draw_cue(std::map<std::string,GLuint>& shaders, scene_structure& scene) {
+    if (!play_allowed)
+        return;
+
+    vec3 vec_dir;
+    if (!is_throwing)
+        vec_dir = normalize(vec3(0, 0, 0) - particles[0].p);
+    else
+        vec_dir = throw_dir;
+    vec_dir.y = -.2;
+
+    vec3 p1 = particles[0].p - vec_dir * .05 - vec_dir * (distance / 4);
+    vec3 p2 = p1 - vec_dir * .75;
+
+    mesh_drawable pool_cue = mesh_primitive_cylinder(0.02f, p1, p2);
+    pool_cue.shader = shaders["mesh_bf"];
+
+    draw(pool_cue, scene.camera);
 }
 
 #endif

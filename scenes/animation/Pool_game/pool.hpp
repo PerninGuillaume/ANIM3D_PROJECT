@@ -59,7 +59,8 @@ struct scene_model : scene_base
 {
     void setup_data(std::map<std::string,GLuint>& shaders, scene_structure& scene, gui_structure& gui);
     void setup_aabb(std::map<std::string, GLuint>& shaders);
-    void draw_objects(scene_structure& scene);
+    void draw_objects(std::map<std::string,GLuint>& shaders, scene_structure& scene);
+    void draw_cue(std::map<std::string,GLuint>& shaders, scene_structure& scene);
     void frame_draw(std::map<std::string,GLuint>& shaders, scene_structure& scene, gui_structure& gui);
 
     void set_gui();
@@ -72,6 +73,7 @@ struct scene_model : scene_base
     void display_particles(scene_structure& scene);
 
     void mouse_click(scene_structure& scene, GLFWwindow* window, int button, int action, int mods);
+    void mouse_move(scene_structure& scene, GLFWwindow* window);
 
     bool check_state();
     void check_score();
@@ -114,6 +116,9 @@ struct scene_model : scene_base
 
     bool is_throwing = false;
     vcl::vec3 throw_pos = vcl::vec3(0, 0, 0);
+
+    float distance = 0;
+    vcl::vec3 throw_dir = vcl::vec3(0, 0, 0);
 
     textRender textRenderer;
 
