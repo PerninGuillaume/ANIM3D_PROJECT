@@ -315,7 +315,7 @@ void scene_model::setup_aabb(std::map<std::string, GLuint>& shaders) {
     float x_ground = 0.635;
     float z_ground = 1.27;
     float width_border = 0.1f;
-    float height_border = 0.2f;
+    float height_border = 0.05f;
     float size_hole = 0.12f;
     float corner_hole_bias = 0.1f;
     float width_hole_side = 0.01f;
