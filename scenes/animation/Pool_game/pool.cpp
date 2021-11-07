@@ -9,6 +9,22 @@ using namespace vcl;
 static float linear_interpolation(float t, float t_final, float angle1, float angle2);
 static vec3 linear_interpolation(float t, float t_final, vec3 p1, vec3 p2);
 
+// This functions reduces the given radian to one that is in the range [0,2*PI]
+static float get_positive_radian(float radian) {
+    return fmod(fmod(radian, 2 * M_PI) + 2 * M_PI, 2 * M_PI);
+}
+
+// We want to avoid multiples useless rotations when the animation of the camera plays
+// This methods ensures the rotations don't go over 180 degrees
+static void smallest_rotations(float& radian_begin, float& radian_end) {
+    if (std::fabs(radian_end - radian_begin) < M_PI) // if angle is already the smallest possible
+        return;
+    if (radian_end > radian_begin)
+        radian_end -= 2 * M_PI;
+    else
+        radian_begin -= 2 * M_PI;
+}
+
 void print_score(textRender& textRenderer, unsigned int score, unsigned int nb_shots) {
     textRenderer.renderText("Score : " + std::to_string(score), 1750.0f, 1050.0f, 1.0f, vec3(0.0, 0.0, 0.0));
     textRenderer.renderText("Number of shots : " + std::to_string(nb_shots), 1650.0f, 1000.0f, 1.0f, vec3(0.0, 0.0, 0.0));
@@ -75,9 +91,11 @@ void scene_model::frame_draw(std::map<std::string,GLuint>& shaders, scene_struct
         play_allowed = true;
         animationCamera.time_animation_begin = timer.t;
 
-        animationCamera.theta_begin = scene.camera.spherical_coordinates.x;
-        animationCamera.phi_begin = scene.camera.spherical_coordinates.y;
-        animationCamera.theta_end = animation_camera::angle_between_center_and_point(particles[0].p);
+        animationCamera.theta_begin = get_positive_radian(scene.camera.spherical_coordinates.x);
+        animationCamera.phi_begin = get_positive_radian(scene.camera.spherical_coordinates.y);
+        animationCamera.theta_end = get_positive_radian(animation_camera::angle_between_center_and_point(particles[0].p));
+        smallest_rotations(animationCamera.theta_begin, animationCamera.theta_end);
+        smallest_rotations(animationCamera.phi_begin, animationCamera.phi_end);
 
         animationCamera.p_begin = animationCamera.p_save;
         animationCamera.p_end = -particles[0].p;
@@ -191,7 +209,7 @@ void scene_model::check_collisions(float partial_alpha, float partial_beta) {
 
                 v = partial_alpha * v_parallel - partial_beta * v_orthogonal;
                 if (!box.bouncing)
-                    v *= 0.1f; // Prevent balls touching the inside of one hole and bouncing back
+                    v.y *= 2.5f; // Prevent balls touching the inside of one hole and bouncing back
 
                 p += normal * (r - dot(aabb_vector, normal));
             }
@@ -501,7 +519,7 @@ void scene_model::mouse_move(scene_structure& scene, GLFWwindow* window) {
 void scene_model::check_score() {
     for (size_t i = 1; i < particles.size(); ++i)
     {
-        if (particles[i].p.y <= -.2f) {
+        if (particles[i].p.y <= -1.0f) {
             particles.erase(particles.begin() + i);
             i--;
             score++;
@@ -510,7 +528,7 @@ void scene_model::check_score() {
 }
 
 void scene_model::check_white_ball() {
-    if (particles[0].p.y <= -.2f) {
+    if (particles[0].p.y <= -1.0f) {
         particles[0].p = white_ball_position;
         particles[0].v = vec3(0, 0, 0);
         ++nb_shots; // If we pocket the white ball, we have a penalty

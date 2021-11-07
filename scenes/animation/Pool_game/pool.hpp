@@ -40,9 +40,9 @@ struct animation_camera
     float animation_duration = 1.0f;
 
     float theta_begin;
-    float phi_begin;
+    float phi_begin = 5.81;
     float theta_end;
-    float phi_end = -0.45;
+    float phi_end = 5.81;
 
     vcl::vec3 p_save;
     vcl::vec3 p_begin;
