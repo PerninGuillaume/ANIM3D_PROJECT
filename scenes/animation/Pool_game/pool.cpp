@@ -360,6 +360,7 @@ void scene_model::set_gui() {
         score = 0;
     }
     ImGui::Checkbox("Animate camera", &animateCamera);
+    ImGui::Checkbox("The point click is the direction of the shot", &pointDir);
     ImGui::SliderFloat("Time scale", &timer.scale, 0.05f, 2.0f, "%.2f s");
     ImGui::SliderFloat("Camera animation time duration", &animationCamera.animation_duration, 0.2f, 5.0f, "%.2f s");
     ImGui::SliderInt("Number of collisions computations in one frame", &steps_in_frame, 1, 20);
@@ -443,6 +444,8 @@ void scene_model::mouse_click(scene_structure& scene, GLFWwindow* window, int , 
         if (intersectPlane(n, p0, r, p)) {
             throw_pos = p;
             is_throwing = true;
+            if (pointDir)
+                cane_direction = normalize(p - particles[0].p); // The cane is in the direction of the shoot
         }
     }
 
@@ -485,8 +488,12 @@ void scene_model::mouse_move(scene_structure& scene, GLFWwindow* window) {
             distance = dot(-throw_dir, p - throw_pos);
             distance = std::max(0.f, distance);
         }
-        else {
-            throw_dir = normalize(p - particles[0].p);
+        else if (play_allowed){
+            if (pointDir)
+                throw_dir = normalize(p - particles[0].p);
+            else
+                throw_dir = normalize(particles[0].p - scene.camera.camera_position());
+            cane_direction = normalize(particles[0].p - scene.camera.camera_position()); // The cane is in the direction of the camera
         }
     }
 }
@@ -562,15 +569,14 @@ void scene_model::draw_cue(std::map<std::string,GLuint>& shaders, scene_structur
     if (!play_allowed)
         return;
 
-    vec3 vec_dir = throw_dir;
     /* if (!is_throwing)
         vec_dir = normalize(vec3(0, 0, 0) - particles[0].p);
     else
         vec_dir = throw_dir;*/
-    vec_dir.y = -.2;
+    cane_direction.y = -.2;
 
-    vec3 p1 = particles[0].p - vec_dir * .05 - vec_dir * (distance / 4);
-    vec3 p2 = p1 - vec_dir * .75;
+    vec3 p1 = particles[0].p - cane_direction * .05 - cane_direction * (distance / 4);
+    vec3 p2 = p1 - cane_direction * .75;
 
     mesh_drawable pool_cue = mesh_primitive_cylinder(0.02f, p1, p2);
     pool_cue.shader = shaders["mesh_bf"];

@@ -123,8 +123,9 @@ void camera_scene::apply_rotation(float x0, float y0, float x1, float y1)
     if(camera_type == camera_control_spherical_coordinates)
     {
         // Assume z-coordinate is up-direction
-        const float dtheta = x1-x0;
-        const float dphi = y1-y0;
+        const float speed_rotation = 2.0f;
+        const float dtheta = speed_rotation * (x1-x0);
+        const float dphi = (y1-y0);
 
         spherical_coordinates.x -= dtheta;
         spherical_coordinates.y += dphi;

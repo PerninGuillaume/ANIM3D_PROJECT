@@ -106,6 +106,8 @@ struct scene_model : scene_base
     float alpha = .985f; // Restitution coefficient in parallel direction (friction)
     float beta = .985f; // Restitution coefficient in orthogonal direction (impact)
 
+    bool pointDir = false;
+
     unsigned int score = 0;
     unsigned int nb_shots = 0;
     bool play_allowed = true;
@@ -116,6 +118,7 @@ struct scene_model : scene_base
 
     bool is_throwing = false;
     vcl::vec3 throw_pos = vcl::vec3(0, 0, 0);
+    vcl::vec3 cane_direction = vcl::vec3(0,0,0);
 
     float distance = 0;
     vcl::vec3 throw_dir = normalize(-white_ball_position);
