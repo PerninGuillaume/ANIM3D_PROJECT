@@ -6,8 +6,8 @@
 
 using namespace vcl;
 
-static float linear_interpolation(float t, float t_final, const float angle1, const float angle2);
-static vec3 linear_interpolation(float t, float t_final, const vec3 p1, const vec3 p2);
+static float linear_interpolation(float t, float t_final, float angle1, float angle2);
+static vec3 linear_interpolation(float t, float t_final, vec3 p1, vec3 p2);
 
 void scene_model::draw_objects(scene_structure& scene) {
     display_particles(scene);
@@ -16,7 +16,7 @@ void scene_model::draw_objects(scene_structure& scene) {
     // TODO the balls appear black when we render the text before the balls (possible issue with texture afterwards)
 }
 
-void scene_model::frame_draw(std::map<std::string,GLuint>& shaders, scene_structure& scene, gui_structure& )
+void scene_model::frame_draw(std::map<std::string,GLuint>&, scene_structure& scene, gui_structure& )
 {
     float dt = 0.02f * timer.scale;
     timer.update();
@@ -26,7 +26,7 @@ void scene_model::frame_draw(std::map<std::string,GLuint>& shaders, scene_struct
     set_gui();
 
     if (in_animation) {
-        animationCamera.update_camera(scene, animationCamera.interpolate_reference_position(t),
+        animation_camera::update_camera(scene, animationCamera.interpolate_reference_position(t),
                                       animationCamera.interpolate_camera_position(t));
         draw_objects(scene);
         return;
@@ -54,7 +54,7 @@ void scene_model::frame_draw(std::map<std::string,GLuint>& shaders, scene_struct
         animationCamera.p_end = -particles[0].p;
         animationCamera.p_save = -particles[0].p;
         if (!animateCamera)
-            animationCamera.update_camera(scene, animationCamera.p_end, vec2{animationCamera.theta_begin, animationCamera.phi_begin});
+            animation_camera::update_camera(scene, animationCamera.p_end, vec2{animationCamera.theta_begin, animationCamera.phi_begin});
 
 
     }
@@ -76,6 +76,31 @@ vcl::vec2 animation_camera::interpolate_camera_position(float t) const {
 vcl::vec3 animation_camera::interpolate_reference_position(float t) const {
     vec3 p = linear_interpolation(t - time_animation_begin, animation_duration, p_begin, p_end);
     return p;
+}
+
+// Ideas from https://learnopengl.com/In-Practice/2D-Game/Collisions/Collision-resolution
+// This functions helps to determine the normal along which the collisions happens on an aabb
+vcl::vec3 aabb_vector_direction(const vcl::vec3& aabb_vector) {
+    const size_t sizeCompass = 6;
+    vec3 compass[sizeCompass] = {
+            vec3(0.0f, 1.0f, 0.0f),	// y+
+            vec3(0.0f, -1.0f, 0.0f),	// y-
+            vec3(1.0f, 0.0f, 0.0f),	// x+
+            vec3(-1.0f, 0.0f, 0.0f),	// x-
+            vec3(0.0f, 0.0f, 1.0f),	// z+
+            vec3(0.0f, 0.0f, -1.0f)	// z+
+    };
+    float dot_max = 0.0f;
+    size_t i_max = 0;
+    for (size_t i = 0; i < sizeCompass; ++i) {
+        float dot_tmp = dot(compass[i], aabb_vector);
+        if (dot_tmp > dot_max) {
+            dot_max = dot_tmp;
+            i_max = i;
+        }
+    }
+    return compass[i_max];
+
 }
 
 void scene_model::check_collisions(float partial_alpha, float partial_beta) {
@@ -117,6 +142,7 @@ void scene_model::check_collisions(float partial_alpha, float partial_beta) {
         }
     }
 
+    // Inspired from https://developer.mozilla.org/en-US/docs/Games/Techniques/3D_collision_detection
     // Code to check intersection with finite object using aabb
     for (size_t k = 0; k < N; ++k) {
         particle_structure& particle = particles[k];
@@ -129,16 +155,18 @@ void scene_model::check_collisions(float partial_alpha, float partial_beta) {
             float z = std::max(box.minZ, std::min(p.z, box.maxZ));
             vec3 closest_point_aabb = vec3{x, y, z};
 
-            float distance = vcl::norm(p - closest_point_aabb);
+            vec3 aabb_vector = p - closest_point_aabb; //TODO what if the center of the ball is so inside the aabb that the vector is reversed
+            float distance = vcl::norm(aabb_vector);
             if (distance <= r) {
-                vec3 v_orthogonal = dot(v, box.normal) * box.normal;
+                vec3 normal = aabb_vector_direction(aabb_vector);
+                vec3 v_orthogonal = dot(v, normal) * normal;
                 vec3 v_parallel = v - v_orthogonal;
 
                 v = partial_alpha * v_parallel - partial_beta * v_orthogonal;
                 if (!box.bouncing)
                     v *= 0.1f; // Prevent balls touching the inside of one hole and bouncing back
 
-                p += box.normal * (r - dot(p - closest_point_aabb, box.normal));
+                p += normal * (r - dot(aabb_vector, normal));
             }
         }
     }
@@ -175,6 +203,8 @@ void scene_model::white_ball_setup() {
     white_ball.r = radius_ball;
     white_ball.c = vec3(1, 1, 1);
     white_ball.p = white_ball_position;
+    //white_ball.p = vec3(0.55, 0.030000, 0.021925); TODO change to this to see a bug that needs resolving
+
 
     particles.insert(particles.begin(), white_ball);
 
@@ -257,25 +287,22 @@ void scene_model::setup_aabb(std::map<std::string, GLuint>& shaders) {
     float width_hole_side = 0.01f;
 
     // A pool table is symmetric along its z and x axis so we don't need to specify all corners
-    std::vector<aabb> corners = {{x_ground - width_hole_side, x_ground, 0, height_border, 0, size_hole / 2.0f, {-1, 0, 0}, false},
-                                 //{x_ground - width_border, x_ground - width_hole_side, 0, height_border, size_hole / 2.0f, size_hole / 2.0f, {0, 0, -1}, false},
-                                 {x_ground - width_border, x_ground - width_border + 0.01f, 0, height_border, size_hole / 2.0f, z_ground - width_border - corner_hole_bias, {-1, 0, 0}, true},
-                                 {x_ground - width_hole_side, x_ground, 0, height_border, z_ground - width_border - corner_hole_bias, z_ground - width_hole_side, {-1, 0, 0}, false},
-                                 {x_ground - width_border - corner_hole_bias, x_ground - width_hole_side, 0, height_border, z_ground - width_hole_side, z_ground, {0, 0, -1}, false},
-                                 {0, x_ground - width_border - corner_hole_bias, 0, height_border, z_ground - width_border, z_ground, {0, 0, -1}, true}};
+    std::vector<aabb> corners = {{x_ground - width_hole_side, x_ground, 0, height_border, 0, size_hole / 2.0f, false},
+                                 {x_ground - width_border, x_ground - width_hole_side, 0, height_border, size_hole / 2.0f, size_hole / 2.0f, false},
+                                 {x_ground - width_border, x_ground, 0, height_border, size_hole / 2.0f, z_ground - width_border - corner_hole_bias, true},
+                                 {x_ground - width_hole_side, x_ground, 0, height_border, z_ground - width_border - corner_hole_bias, z_ground - width_hole_side, false},
+                                 {x_ground - width_border - corner_hole_bias, x_ground - width_hole_side, 0, height_border, z_ground - width_hole_side, z_ground, false},
+                                 {0, x_ground - width_border - corner_hole_bias, 0, height_border, z_ground - width_border, z_ground, true}};
 
     for (int symmetric_x = -1; symmetric_x <= 1; symmetric_x += 2) {
         for (int symmetric_z = -1; symmetric_z <= 1; symmetric_z += 2) {
-            for (size_t i = 0; i < corners.size(); ++i) {
-                aabb& corner = corners[i];
-                vec3 normal = vec3(corner.normal.x * symmetric_x, corner.normal.y, corner.normal.z * symmetric_z);
-                boundaries.emplace_back(corner.minX * symmetric_x, corner.maxX * symmetric_x, corner.minY, corner.maxY, corner.minZ * symmetric_z, corner.maxZ * symmetric_z, normal, corner.bouncing);
+            for (const auto& corner : corners) {
+                boundaries.emplace_back(corner.minX * symmetric_x, corner.maxX * symmetric_x, corner.minY, corner.maxY, corner.minZ * symmetric_z, corner.maxZ * symmetric_z, corner.bouncing);
             }
         }
     }
 
-    boundaries.push_back({-x_ground + width_border, x_ground - width_border, -0.2, 0, -z_ground + width_border, z_ground - width_border, {0,1,0}, true});
-    float height_under_ground = -1.0f;
+    boundaries.emplace_back(-x_ground + width_border, x_ground - width_border, -0.2, 0, -z_ground + width_border, z_ground - width_border, true);
 
     ground = mesh_drawable(mesh_primitive_quad({-x_ground + width_border,0,-z_ground + width_border}, {x_ground - width_border,0,-z_ground + width_border}, {x_ground - width_border,0,z_ground - width_border}, {-x_ground + width_border,0,z_ground - width_border}));
 
@@ -332,7 +359,7 @@ void scene_model::set_gui()
     if(start_anim) timer.start();
 }
 
-aabb::aabb(float minX, float maxX, float minY, float maxY, float minZ, float maxZ, vcl::vec3 normal, bool bouncing) {
+aabb::aabb(float minX, float maxX, float minY, float maxY, float minZ, float maxZ, bool bouncing) {
     if (minX <= maxX) {
         this->minX = minX;
         this->maxX = maxX;
@@ -354,7 +381,6 @@ aabb::aabb(float minX, float maxX, float minY, float maxY, float minZ, float max
         this->minZ = maxZ;
         this->maxZ = minZ;
     }
-    this->normal = normalize(normal);
     this->bouncing = bouncing;
 }
 

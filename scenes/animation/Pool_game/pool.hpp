@@ -7,14 +7,13 @@
 
 struct aabb
 {
-    aabb(float minX, float maxX, float minY, float maxY, float minZ, float maxZ, vcl::vec3 normal, bool bouncing);
+    aabb(float minX, float maxX, float minY, float maxY, float minZ, float maxZ, bool bouncing);
     float minX;
     float maxX;
     float minY;
     float maxY;
     float minZ;
     float maxZ;
-    vcl::vec3 normal;
     bool bouncing;
 };
 
@@ -53,7 +52,7 @@ struct animation_camera
 
     vcl::vec3 interpolate_reference_position(float t) const;
     static float angle_between_center_and_point(const vcl::vec3 &point);
-    void update_camera(scene_structure& scene, vcl::vec3 position, vcl::vec2 spherical_coordinates);
+    static void update_camera(scene_structure& scene, vcl::vec3 position, vcl::vec2 spherical_coordinates);
 };
 
 struct scene_model : scene_base
