@@ -450,6 +450,10 @@ void scene_model::mouse_click(scene_structure& scene, GLFWwindow* window, int , 
 
     else if (mouse_released_left && play_allowed && is_throwing && !in_animation) {
         is_throwing = false;
+
+        if (distance == 0)
+            return;
+
         play_allowed = false;
         ++nb_shots;
 
