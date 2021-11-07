@@ -118,7 +118,7 @@ struct scene_model : scene_base
     vcl::vec3 throw_pos = vcl::vec3(0, 0, 0);
 
     float distance = 0;
-    vcl::vec3 throw_dir = vcl::vec3(0, 0, 0);
+    vcl::vec3 throw_dir = normalize(-white_ball_position);
 
     textRender textRenderer;
 

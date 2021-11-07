@@ -127,7 +127,6 @@ vcl::vec3 aabb_vector_direction(const vcl::vec3& aabb_vector) {
         }
     }
     return compass[i_max];
-
 }
 
 void scene_model::check_collisions(float partial_alpha, float partial_beta) {
@@ -443,7 +442,6 @@ void scene_model::mouse_click(scene_structure& scene, GLFWwindow* window, int , 
 
         if (intersectPlane(n, p0, r, p)) {
             throw_pos = p;
-            throw_dir = normalize(throw_pos - particles[0].p);
             is_throwing = true;
         }
     }
@@ -470,23 +468,25 @@ void scene_model::mouse_click(scene_structure& scene, GLFWwindow* window, int , 
 }
 
 void scene_model::mouse_move(scene_structure& scene, GLFWwindow* window) {
-    if (is_throwing) {
-        // Cursor coordinates
-        const vec2 cursor = glfw_cursor_coordinates_window(window);
+    // Cursor coordinates
+    const vec2 cursor = glfw_cursor_coordinates_window(window);
 
-        // Create the 3D ray passing by the selected point on the screen
-        const ray r = picking_ray(scene.camera, cursor);
+    // Create the 3D ray passing by the selected point on the screen
+    const ray r = picking_ray(scene.camera, cursor);
 
-        // Check if this ray intersects the ground
-        vec3 p0 = vec3(0, 0, 0);
-        vec3 n = vec3(0, -1, 0);
+    // Check if this ray intersects the ground
+    vec3 p0 = vec3(0, 0, 0);
+    vec3 n = vec3(0, -1, 0);
 
-        vec3 p;
+    vec3 p;
 
-        if (intersectPlane(n, p0, r, p)) {
+    if (intersectPlane(n, p0, r, p)) {
+        if (is_throwing) {
             distance = dot(-throw_dir, p - throw_pos);
-
             distance = std::max(0.f, distance);
+        }
+        else {
+            throw_dir = normalize(p - particles[0].p);
         }
     }
 }
@@ -562,11 +562,11 @@ void scene_model::draw_cue(std::map<std::string,GLuint>& shaders, scene_structur
     if (!play_allowed)
         return;
 
-    vec3 vec_dir;
-    if (!is_throwing)
+    vec3 vec_dir = throw_dir;
+    /* if (!is_throwing)
         vec_dir = normalize(vec3(0, 0, 0) - particles[0].p);
     else
-        vec_dir = throw_dir;
+        vec_dir = throw_dir;*/
     vec_dir.y = -.2;
 
     vec3 p1 = particles[0].p - vec_dir * .05 - vec_dir * (distance / 4);
