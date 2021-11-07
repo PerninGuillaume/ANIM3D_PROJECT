@@ -30,7 +30,7 @@ void textRender::setup_font(std::map<std::string,GLuint>& shaders)
     if (FT_New_Face(ft, font_name, 0, &face)) {
         throw std::runtime_error("ERROR::FREETYPE: Failed to load font");
     }
-    FT_Set_Pixel_Sizes(face, 0, 48);
+    FT_Set_Pixel_Sizes(face, 0, 28);
     glPixelStorei(GL_PACK_ALIGNMENT, 1);
 
     for (unsigned char c = 0; c < 128; ++c) {

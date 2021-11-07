@@ -76,6 +76,7 @@ struct scene_model : scene_base
     bool check_state();
     void check_score();
     void check_white_ball();
+    void check_end_game();
 
 
     // Textures
@@ -103,9 +104,11 @@ struct scene_model : scene_base
     float alpha = .985f; // Restitution coefficient in parallel direction (friction)
     float beta = .985f; // Restitution coefficient in orthogonal direction (impact)
 
-    int score = 0;
+    unsigned int score = 0;
+    unsigned int nb_shots = 0;
     bool play_allowed = true;
     bool in_animation = true;
+    bool gameFinished = false;
     bool animateCamera = true;
     animation_camera animationCamera;
 
@@ -113,6 +116,7 @@ struct scene_model : scene_base
     vcl::vec3 throw_pos = vcl::vec3(0, 0, 0);
 
     textRender textRenderer;
+
 };
 
 #endif

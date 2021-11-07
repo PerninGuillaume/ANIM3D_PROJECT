@@ -9,11 +9,38 @@ using namespace vcl;
 static float linear_interpolation(float t, float t_final, float angle1, float angle2);
 static vec3 linear_interpolation(float t, float t_final, vec3 p1, vec3 p2);
 
+void print_score(textRender& textRenderer, unsigned int score, unsigned int nb_shots) {
+    textRenderer.renderText("Score : " + std::to_string(score), 1750.0f, 1050.0f, 1.0f, vec3(0.0, 0.0, 0.0));
+    textRenderer.renderText("Number of shots : " + std::to_string(nb_shots), 1650.0f, 1000.0f, 1.0f, vec3(0.0, 0.0, 0.0));
+    // TODO the balls appear black when we render the text before the balls (possible issue with texture afterwards)
+}
+
+void print_end_game(textRender& textRenderer, unsigned int nb_shots) {
+    std::map<unsigned int, std::string> win_messages = {{16, "Congratulation ! You must be either a god or a cheater"},
+                                               {24, "Congratulation ! You mastered the game !"},
+                                               {32, "Congratulation ! Your score is great !"},
+                                               {40, "Congratulation ! You can do better !"},
+                                               {50, "Come on, try to aim next time"},
+                                               {60, "Are you even trying ?"}};
+    auto it = win_messages.upper_bound(nb_shots);
+    std::string message;
+    if (it == win_messages.end())
+        message = "What happened ? A special case in the code had to be written just because of people like you";
+    else
+        message = it->second;
+
+    textRenderer.renderText("Number of shots : " + std::to_string(nb_shots), 1650.0f, 1000.0f, 1.0f, vec3(0.0, 0.0, 0.0));
+    textRenderer.renderText(message, 700.0f, 500.0f, 1.0f, vec3(0.0, 0.0, 0.0));
+}
+
 void scene_model::draw_objects(scene_structure& scene) {
     display_particles(scene);
     draw(borders, scene.camera);
-    textRenderer.renderText("Score : " + std::to_string(score), 1550.0f, 950.0f, 1.0f, vec3(0.0, 0.0, 0.0));
-    // TODO the balls appear black when we render the text before the balls (possible issue with texture afterwards)
+    if (gameFinished)
+        print_end_game(textRenderer, nb_shots);
+    else
+        print_score(textRenderer, score, nb_shots);
+
 }
 
 void scene_model::frame_draw(std::map<std::string,GLuint>&, scene_structure& scene, gui_structure& )
@@ -62,6 +89,7 @@ void scene_model::frame_draw(std::map<std::string,GLuint>&, scene_structure& sce
 
     check_score();
     check_white_ball();
+    check_end_game();
 
     //draw(pool_visual, scene.camera);
     //glBindTexture(GL_TEXTURE_2D, scene.texture_white);
@@ -207,15 +235,6 @@ void scene_model::white_ball_setup() {
 
 
     particles.insert(particles.begin(), white_ball);
-
-    particle_structure black_ball;
-
-    black_ball.r = radius_ball;
-    black_ball.c = vec3(1, 1, 1);
-    black_ball.p = vec3(0, 0, .6);
-    black_ball.c = vec3(0,0,0);
-
-    particles.push_back(black_ball);
 }
 
 // Use this function to create the triangle and erase the balls still present in the scene
@@ -342,6 +361,8 @@ void scene_model::set_gui()
         reset = false;
         triangle_base_configuration();
         white_ball_setup();
+        nb_shots = 0;
+        score = 0;
     }
     ImGui::Checkbox("Animate camera", &animateCamera);
     ImGui::SliderFloat("Time scale", &timer.scale, 0.05f, 2.0f, "%.2f s");
@@ -350,7 +371,8 @@ void scene_model::set_gui()
     ImGui::SliderFloat("Max launch speed", &max_speed, 1.0f, 15.f, "%.1f");
     ImGui::SliderFloat("Friction", &alpha, .97f, .99f, "%.3f s");
     ImGui::SliderFloat("Impact", &beta, 0.97f, .99f, "%.3f s");
-    ImGui::SliderInt("Score", &score, 0, 20);
+    ImGui::SliderInt("Score", (int*)&score, 0, 100);
+    ImGui::SliderInt("Number of shots", (int*)&nb_shots, 0, 100);
 
     bool stop_anim  = ImGui::Button("Stop"); ImGui::SameLine();
     bool start_anim = ImGui::Button("Start");
@@ -444,7 +466,6 @@ void scene_model::mouse_click(scene_structure& scene, GLFWwindow* window, int , 
 
         if (intersectPlane(n, p0, r, p)) {
             is_throwing = false;
-            play_allowed = false;
 
             vec3 throw_dir = normalize(throw_pos - particles[0].p);
             float distance = dot(-throw_dir, p - throw_pos);
@@ -452,6 +473,8 @@ void scene_model::mouse_click(scene_structure& scene, GLFWwindow* window, int , 
             if (distance <= 0) {
                 return;
             }
+            play_allowed = false;
+            ++nb_shots;
 
             particles[0].v = normalize(throw_dir) * distance * 5.f;
 
@@ -482,6 +505,13 @@ void scene_model::check_white_ball()
     if (particles[0].p.y <= -.2f) {
         particles[0].p = white_ball_position;
         particles[0].v = vec3(0, 0, 0);
+        ++nb_shots; // If we pocket the white ball, we have a penalty
+    }
+}
+
+void scene_model::check_end_game() {
+    if (particles.size() == 1) { // We pocketed all the balls expect the white one
+        gameFinished = true;
     }
 }
 
