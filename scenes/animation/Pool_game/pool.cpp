@@ -605,11 +605,7 @@ void scene_model::draw_cue(std::map<std::string,GLuint>& shaders, scene_structur
     cane_dir_tmp = normalize(cane_dir_tmp);
     // We convert to spherical coordinate to be able to specify an angle
     // and still keeping the normalized vector
-    float phi;
-    if (cane_dir_tmp.x > 0)
-        phi = std::atan(cane_dir_tmp.z / cane_dir_tmp.x);
-    else
-        phi = std::atan(cane_dir_tmp.z / cane_dir_tmp.x) + M_PI;
+    float phi = std::atan2(cane_dir_tmp.z, cane_dir_tmp.x);
     cane_dir_tmp.x = std::cos(phi) * std::sin(M_PI / 4.0f);
     cane_dir_tmp.z = std::sin(phi) * std::sin(M_PI / 4.0f);
     float angle = 10.0f; // Angle in degree for the cue
