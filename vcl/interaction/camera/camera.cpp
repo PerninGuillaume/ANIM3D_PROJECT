@@ -130,7 +130,8 @@ void camera_scene::apply_rotation(float x0, float y0, float x1, float y1)
         spherical_coordinates.x -= dtheta;
         spherical_coordinates.y += dphi;
         const float theta = spherical_coordinates.x;
-        const float phi   = spherical_coordinates.y;
+        // To restrict angle view
+        const float phi   = std::min(std::max(spherical_coordinates.y, (float)(M_PI * 3.0f/2.0f + 0.1)), (float)(2.0f * M_PI - 0.1));
 
         const mat3 Rx = { 1,      0        ,     0           ,
                           0,std::cos(phi), -std::sin(phi),
@@ -161,7 +162,7 @@ void camera_scene::apply_rotation(float x0, float y0, float x1, float y1)
 void camera_scene::apply_scaling(float s)
 {
     scale *= (1.0f+s);
-    scale = std::max(scale, 0.01f);
+    scale = std::min(4.0f, std::max(scale, 0.5f));
 }
 
 vec3 camera_scene::camera_position() const

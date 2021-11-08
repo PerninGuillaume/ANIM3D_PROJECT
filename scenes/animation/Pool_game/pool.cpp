@@ -50,9 +50,12 @@ void print_end_game(textRender& textRenderer, unsigned int nb_shots) {
 }
 
 void scene_model::draw_objects(std::map<std::string,GLuint>& shaders, scene_structure& scene) {
+    draw(pool_visual, scene.camera);
+    draw(plane_pool_visual, scene.camera);
+    glBindTexture(GL_TEXTURE_2D, scene.texture_white); // To reset the texture
     display_particles(scene);
 
-    draw(borders, scene.camera);
+    //draw(borders, scene.camera);
     draw_cue(shaders, scene);
 
     if (gameFinished)
@@ -74,7 +77,7 @@ void scene_model::frame_draw(std::map<std::string,GLuint>& shaders, scene_struct
         animation_camera::update_camera(scene, animationCamera.interpolate_reference_position(t),
                                       animationCamera.interpolate_camera_position(t));
         draw_objects(shaders, scene);
-        return;
+        //return;
     }
 
     float partial_alpha = std::pow(alpha, 1.0/steps_in_frame);
@@ -259,7 +262,7 @@ void scene_model::triangle_base_configuration() {
     static const std::vector<vec3> color_lut = {{1,0,0},{0,1,0},{0,0,1},{1,1,0},{1,0,1},{0,1,1}};
     float diameter_ball = 2.0f * radius_ball;
     float offset_z = std::sqrt(3.0f) * radius_ball; // Found by looking for the z that minimizes the norm between 2 balls
-    vec3 offset_triangle = vec3{-2.0f * diameter_ball, 0.0f, -.8f};
+    vec3 offset_triangle = vec3{-2.0f * diameter_ball, 0.03f, -.8f};
 
     for (size_t i = 0; i < 5; ++i) {
         for (size_t j = 0; j < 5 - i; ++j) {
@@ -357,15 +360,21 @@ void scene_model::setup_data(std::map<std::string,GLuint>& shaders, scene_struct
     scene.camera.camera_type = camera_control_spherical_coordinates;
     animationCamera.update_camera(scene, -white_ball_position, vec2(0,0));
 
-    // texture_wood  = create_texture_gpu(image_load_png("scenes/animation/02_simulation/assets/wood.png"));
-    // texture_green = create_texture_gpu(image_load_png("scenes/animation/Pool_game/assets/green.png"));
     sphere = mesh_drawable( mesh_primitive_sphere(1.0f));
     sphere.shader = shaders["mesh"];
 
-    // this->pool = mesh_load_file_obj("scenes/animation/Pool_game/assets/pool.obj");
-    // pool_visual = mesh_drawable(pool);
-    // pool_visual.shader = shaders["mesh_bf"];
-    // pool_visual.texture_id = texture_wood;
+    this->pool = mesh_load_file_obj("scenes/animation/Pool_game/assets/pool.obj");
+    this->plane_pool = mesh_load_file_obj("scenes/animation/Pool_game/assets/plane_pool.obj");
+    texture_wood  = create_texture_gpu(image_load_png("scenes/animation/02_simulation/assets/wood.png"));
+    texture_green  = create_texture_gpu(image_load_png("scenes/animation/Pool_game/assets/green.png"));
+    texture_cue = create_texture_gpu(image_load_png("scenes/animation/Pool_game/assets/macassar.png"));
+
+    pool_visual = mesh_drawable(pool);
+    pool_visual.shader = shaders["mesh_bf"];
+    //pool_visual.uniform.shading.specular = 0.0f;
+    pool_visual.texture_id = texture_wood;
+
+    plane_pool_visual = mesh_drawable(plane_pool, shaders["mesh_bf"], texture_green);
 }
 
 void scene_model::set_gui() {
@@ -511,9 +520,9 @@ void scene_model::mouse_move(scene_structure& scene, GLFWwindow* window) {
                 throw_dir = normalize(p - particles[0].p);
             else
                 throw_dir = normalize(particles[0].p - scene.camera.camera_position());
-            cane_direction = normalize(particles[0].p - scene.camera.camera_position()); // The cane is in the direction of the camera
         }
     }
+    cane_direction = normalize(particles[0].p - scene.camera.camera_position()); // The cane is in the direction of the camera
 }
 
 void scene_model::check_score() {
@@ -591,13 +600,27 @@ void scene_model::draw_cue(std::map<std::string,GLuint>& shaders, scene_structur
         vec_dir = normalize(vec3(0, 0, 0) - particles[0].p);
     else
         vec_dir = throw_dir;*/
-    cane_direction.y = -.2;
+    vec3 cane_dir_tmp = cane_direction;
+    cane_dir_tmp.y = -0.2f;
+    cane_dir_tmp = normalize(cane_dir_tmp);
+    // We convert to spherical coordinate to be able to specify an angle
+    // and still keeping the normalized vector
+    float phi;
+    if (cane_dir_tmp.x > 0)
+        phi = std::atan(cane_dir_tmp.z / cane_dir_tmp.x);
+    else
+        phi = std::atan(cane_dir_tmp.z / cane_dir_tmp.x) + M_PI;
+    cane_dir_tmp.x = std::cos(phi) * std::sin(M_PI / 4.0f);
+    cane_dir_tmp.z = std::sin(phi) * std::sin(M_PI / 4.0f);
+    float angle = 10.0f; // Angle in degree for the cue
+    cane_dir_tmp.y = -std::cos( (90.0f - angle) * M_PI / 180.0f);
 
-    vec3 p1 = particles[0].p - cane_direction * .05 - cane_direction * (distance / 4);
-    vec3 p2 = p1 - cane_direction * .75;
+    vec3 p1 = particles[0].p - cane_dir_tmp * .05 - cane_dir_tmp * (distance / 4);
+    vec3 p2 = p1 - cane_dir_tmp * .75;
 
     mesh_drawable pool_cue = mesh_primitive_cylinder(0.02f, p1, p2);
     pool_cue.shader = shaders["mesh_bf"];
+    pool_cue.texture_id = texture_cue;
 
     draw(pool_cue, scene.camera);
 }

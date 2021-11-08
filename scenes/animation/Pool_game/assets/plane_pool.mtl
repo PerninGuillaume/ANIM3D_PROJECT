@@ -1,13 +1,13 @@
 # Blender MTL File: 'pool.blend'
 # Material Count: 1
 
-newmtl Material
-Ns 221.069960
+newmtl Material.002
+Ns 225.000000
 Ka 1.000000 1.000000 1.000000
 Kd 0.800000 0.800000 0.800000
-Ks 0.323209 0.323209 0.323209
+Ks 0.500000 0.500000 0.500000
 Ke 0.000000 0.000000 0.000000
 Ni 1.450000
 d 1.000000
 illum 2
-map_Kd /home/pernin/Documents/ING3/ANIM3D_PROJECT/scenes/animation/02_simulation/assets/wood.png
+map_Kd green.png

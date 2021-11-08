@@ -84,6 +84,7 @@ struct scene_model : scene_base
     // Textures
     GLuint texture_green;
     GLuint texture_wood;
+    GLuint texture_cue;
     std::vector<particle_structure> particles;
 
     std::vector<aabb> boundaries;
@@ -92,6 +93,8 @@ struct scene_model : scene_base
     vcl::mesh_drawable ground;
     vcl::mesh pool;
     vcl::mesh_drawable pool_visual;
+    vcl::mesh plane_pool;
+    vcl::mesh_drawable plane_pool_visual;
     vcl::segments_drawable borders; // Visual display of borders
 
     vcl::timer_event timer;
@@ -118,7 +121,7 @@ struct scene_model : scene_base
 
     bool is_throwing = false;
     vcl::vec3 throw_pos = vcl::vec3(0, 0, 0);
-    vcl::vec3 cane_direction = vcl::vec3(0,0,0);
+    vcl::vec3 cane_direction = vcl::vec3(0,-0.2,-1);
 
     float distance = 0;
     vcl::vec3 throw_dir = normalize(-white_ball_position);
