@@ -353,6 +353,8 @@ void scene_model::setup_aabb(std::map<std::string, GLuint>& shaders) {
 }
 
 void scene_model::setup_data(std::map<std::string,GLuint>& shaders, scene_structure& scene, gui_structure& ) {
+    glfwWindowHint(GLFW_SAMPLES, 4);
+    glEnable(GL_MULTISAMPLE);
     textRenderer.setup_font(shaders);
     setup_aabb(shaders);
     triangle_base_configuration();
@@ -369,22 +371,26 @@ void scene_model::setup_data(std::map<std::string,GLuint>& shaders, scene_struct
     texture_green  = create_texture_gpu(image_load_png("scenes/animation/Pool_game/assets/green.png"));
     texture_cue = create_texture_gpu(image_load_png("scenes/animation/Pool_game/assets/macassar.png"));
 
-    pool_visual = mesh_drawable(pool);
-    pool_visual.shader = shaders["mesh_bf"];
-    //pool_visual.uniform.shading.specular = 0.0f;
-    pool_visual.texture_id = texture_wood;
+    pool_visual = mesh_drawable(pool, shaders["mesh_bf"], texture_wood);
+    pool_visual.uniform.shading.specular = 0.0f;
 
     plane_pool_visual = mesh_drawable(plane_pool, shaders["mesh_bf"], texture_green);
+    plane_pool_visual.uniform.shading.specular = 0.0f;
+}
+
+void scene_model::reset_game() {
+    triangle_base_configuration();
+    white_ball_setup();
+    nb_shots = 0;
+    score = 0;
+    gameFinished = false;
 }
 
 void scene_model::set_gui() {
     // Can set the speed of the animation
     if (ImGui::Checkbox("Reset Pool Board", &reset)) {
         reset = false;
-        triangle_base_configuration();
-        white_ball_setup();
-        nb_shots = 0;
-        score = 0;
+        reset_game();
     }
     ImGui::Checkbox("Animate camera", &animateCamera);
     ImGui::Checkbox("The point click is the direction of the shot", &pointDir);
@@ -485,7 +491,7 @@ void scene_model::mouse_click(scene_structure& scene, GLFWwindow* window, int , 
         play_allowed = false;
         ++nb_shots;
 
-        particles[0].v = throw_dir * distance * 5.f;
+        particles[0].v = throw_dir * distance * 10.f;
 
         float norm_speed = norm(particles[0].v);
         if (norm_speed > max_speed) {

@@ -57,6 +57,7 @@ struct animation_camera
 
 struct scene_model : scene_base
 {
+    void reset_game();
     void setup_data(std::map<std::string,GLuint>& shaders, scene_structure& scene, gui_structure& gui);
     void setup_aabb(std::map<std::string, GLuint>& shaders);
     void draw_objects(std::map<std::string,GLuint>& shaders, scene_structure& scene);
@@ -105,7 +106,7 @@ struct scene_model : scene_base
     vcl::vec3 white_ball_position = vcl::vec3{0,0,0.8};
 
     int steps_in_frame = 10;
-    float max_speed = 7.5f;
+    float max_speed = 10.0f;
     float alpha = .985f; // Restitution coefficient in parallel direction (friction)
     float beta = .985f; // Restitution coefficient in orthogonal direction (impact)
 
