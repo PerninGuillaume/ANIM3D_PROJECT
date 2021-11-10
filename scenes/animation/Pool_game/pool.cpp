@@ -34,10 +34,10 @@ void print_score(textRender& textRenderer, unsigned int score, unsigned int nb_s
 void print_end_game(textRender& textRenderer, unsigned int nb_shots) {
     std::map<unsigned int, std::string> win_messages = {{16, "Congratulation ! You must be either a god or a cheater"},
                                                {24, "Congratulation ! You mastered the game !"},
-                                               {32, "Congratulation ! Your score is great !"},
-                                               {40, "Congratulation ! You can do better !"},
-                                               {50, "Come on, try to aim next time"},
-                                               {60, "Are you even trying ?"}};
+                                               {36, "Congratulation ! Your score is great !"},
+                                               {45, "Congratulation ! You can do better !"},
+                                               {60, "Come on, try to aim next time"},
+                                               {70, "Are you even trying ?"}};
     auto it = win_messages.upper_bound(nb_shots);
     std::string message;
     if (it == win_messages.end())
@@ -55,8 +55,9 @@ void scene_model::draw_objects(std::map<std::string,GLuint>& shaders, scene_stru
     glBindTexture(GL_TEXTURE_2D, scene.texture_white); // To reset the texture
     display_particles(scene);
 
-    //draw(borders, scene.camera);
-    draw_cue(shaders, scene);
+    draw(borders, scene.camera);
+    if (not in_animation)
+        draw_cue(shaders, scene);
 
     if (gameFinished)
         print_end_game(textRenderer, nb_shots);
@@ -204,15 +205,18 @@ void scene_model::check_collisions(float partial_alpha, float partial_beta) {
             vec3 closest_point_aabb = vec3{x, y, z};
 
             vec3 aabb_vector = p - closest_point_aabb; //TODO what if the center of the ball is so inside the aabb that the vector is reversed
-            float distance = vcl::norm(aabb_vector);
-            if (distance <= r) {
+            float distance_ = vcl::norm(aabb_vector);
+            if (distance_ <= r) {
                 vec3 normal = aabb_vector_direction(aabb_vector);
                 vec3 v_orthogonal = dot(v, normal) * normal;
                 vec3 v_parallel = v - v_orthogonal;
 
                 v = partial_alpha * v_parallel - partial_beta * v_orthogonal;
-                if (!box.bouncing)
-                    v.y *= 2.5f; // Prevent balls touching the inside of one hole and bouncing back
+                v.y = std::min(v.y, 0.0f);
+                if (!box.bouncing) {
+                    //v *= 0.7f;
+                    v.y = -2.0f; // Prevent balls touching the inside of one hole and bouncing back
+                }
 
                 p += normal * (r - dot(aabb_vector, normal));
             }
@@ -259,18 +263,23 @@ void scene_model::white_ball_setup() {
 // Use this function to create the triangle and erase the balls still present in the scene
 void scene_model::triangle_base_configuration() {
     particles.clear();
-    static const std::vector<vec3> color_lut = {{1,0,0},{0,1,0},{0,0,1},{1,1,0},{1,0,1},{0,1,1}};
+    static const std::vector<vec3> color_lut = {{1,0,0},{0,1,0},{0,0,1},{1,1,0},
+        {1,0,1},{0,1,1},{1,0.5,0},{1,0.5,0.5},{0.7, 1, 0.5},{0.5,0.7,0},
+        {0,0.5,1},{0,1,0.5},{0,0.5,0},{0,0,0},{0.5,0,0}};
     float diameter_ball = 2.0f * radius_ball;
     float offset_z = std::sqrt(3.0f) * radius_ball; // Found by looking for the z that minimizes the norm between 2 balls
     vec3 offset_triangle = vec3{-2.0f * diameter_ball, 0.03f, -.8f};
 
+    size_t index = 0;
     for (size_t i = 0; i < 5; ++i) {
         for (size_t j = 0; j < 5 - i; ++j) {
             particle_structure new_ball;
             new_ball.r = radius_ball;
-            new_ball.c = color_lut[int(rand_interval()*color_lut.size())];
+            //new_ball.c = vec3(rand_interval(0.0f, 1.0f), rand_interval(0.0f, 1.0f), rand_interval(0.0f, 1.0f));
+            new_ball.c = color_lut[index];
             new_ball.p = vec3(diameter_ball * (j + i / 2.0f), 0.01f,  i * offset_z) + offset_triangle;
             particles.push_back(new_ball);
+            index++;
         }
     }
 }
@@ -322,14 +331,15 @@ void scene_model::setup_aabb(std::map<std::string, GLuint>& shaders) {
     float size_hole = 0.12f;
     float corner_hole_bias = 0.1f;
     float width_hole_side = 0.01f;
+    float below = -0.5f;
 
     // A pool table is symmetric along its z and x axis so we don't need to specify all corners
-    std::vector<aabb> corners = {{x_ground - width_hole_side, x_ground, 0, height_border, 0, size_hole / 2.0f, false},
-                                 {x_ground - width_border, x_ground - width_hole_side, 0, height_border, size_hole / 2.0f, size_hole / 2.0f, false},
-                                 {x_ground - width_border, x_ground, 0, height_border, size_hole / 2.0f, z_ground - width_border - corner_hole_bias, true},
-                                 {x_ground - width_hole_side, x_ground, 0, height_border, z_ground - width_border - corner_hole_bias, z_ground - width_hole_side, false},
-                                 {x_ground - width_border - corner_hole_bias, x_ground - width_hole_side, 0, height_border, z_ground - width_hole_side, z_ground, false},
-                                 {0, x_ground - width_border - corner_hole_bias, 0, height_border, z_ground - width_border, z_ground, true}};
+    std::vector<aabb> corners = {{x_ground - width_hole_side, x_ground, below, height_border, 0, size_hole / 2.0f, false},
+                                 {x_ground - width_border, x_ground - width_hole_side, below, height_border, size_hole / 2.0f, size_hole / 2.0f, false},
+                                 {x_ground - width_border, x_ground, below, height_border, size_hole / 2.0f, z_ground - width_border - corner_hole_bias, true},
+                                 {x_ground - width_hole_side, x_ground, below, height_border, z_ground - width_border - corner_hole_bias, z_ground - width_hole_side, false},
+                                 {x_ground - width_border - corner_hole_bias, x_ground - width_hole_side, below, height_border, z_ground - width_hole_side, z_ground, false},
+                                 {0, x_ground - width_border - corner_hole_bias, below, height_border, z_ground - width_border, z_ground, true}};
 
     for (int symmetric_x = -1; symmetric_x <= 1; symmetric_x += 2) {
         for (int symmetric_z = -1; symmetric_z <= 1; symmetric_z += 2) {
@@ -534,7 +544,7 @@ void scene_model::mouse_move(scene_structure& scene, GLFWwindow* window) {
 void scene_model::check_score() {
     for (size_t i = 1; i < particles.size(); ++i)
     {
-        if (particles[i].p.y <= -1.0f) {
+        if (particles[i].p.y <= -2.0f) {
             particles.erase(particles.begin() + i);
             i--;
             score++;
@@ -543,7 +553,7 @@ void scene_model::check_score() {
 }
 
 void scene_model::check_white_ball() {
-    if (particles[0].p.y <= -1.0f) {
+    if (particles[0].p.y <= -2.0f) {
         particles[0].p = white_ball_position;
         particles[0].v = vec3(0, 0, 0);
         ++nb_shots; // If we pocket the white ball, we have a penalty
