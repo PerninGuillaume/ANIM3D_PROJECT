@@ -67,7 +67,7 @@ void scene_model::draw_objects(std::map<std::string,GLuint>& shaders, scene_stru
 
 }
 
-void scene_model::frame_draw(std::map<std::string,GLuint>& shaders, scene_structure& scene, gui_structure& ) {
+void scene_model::frame_draw(std::map<std::string,GLuint>& shaders, scene_structure& scene, gui_structure& gui) {
     float dt = 0.02f * timer.scale;
     timer.update();
     float t = timer.t;
@@ -391,20 +391,11 @@ void scene_model::set_gui() {
     }
     ImGui::Checkbox("Animate camera", &animateCamera);
     ImGui::Checkbox("The point click is the direction of the shot", &pointDir);
-    ImGui::SliderFloat("Time scale", &timer.scale, 0.05f, 2.0f, "%.2f s");
     ImGui::SliderFloat("Camera animation time duration", &animationCamera.animation_duration, 0.2f, 5.0f, "%.2f s");
     ImGui::SliderInt("Number of collisions computations in one frame", &steps_in_frame, 1, 20);
     ImGui::SliderFloat("Max launch speed", &max_speed, 1.0f, 15.f, "%.1f");
     ImGui::SliderFloat("Friction", &alpha, .97f, .99f, "%.3f s");
     ImGui::SliderFloat("Impact", &beta, 0.97f, .99f, "%.3f s");
-    ImGui::SliderInt("Score", (int*)&score, 0, 100);
-    ImGui::SliderInt("Number of shots", (int*)&nb_shots, 0, 100);
-
-    bool stop_anim  = ImGui::Button("Stop"); ImGui::SameLine();
-    bool start_anim = ImGui::Button("Start");
-
-    if(stop_anim)  timer.stop();
-    if(start_anim) timer.start();
 }
 
 aabb::aabb(float minX, float maxX, float minY, float maxY, float minZ, float maxZ, bool bouncing) {
