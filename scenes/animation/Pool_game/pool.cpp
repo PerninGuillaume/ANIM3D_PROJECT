@@ -28,7 +28,6 @@ static void smallest_rotations(float& radian_begin, float& radian_end) {
 void print_score(textRender& textRenderer, unsigned int score, unsigned int nb_shots) {
     textRenderer.renderText("Score : " + std::to_string(score), 1750.0f, 1050.0f, 1.0f, vec3(0.0, 0.0, 0.0));
     textRenderer.renderText("Number of shots : " + std::to_string(nb_shots), 1650.0f, 1000.0f, 1.0f, vec3(0.0, 0.0, 0.0));
-    // TODO the balls appear black when we render the text before the balls (possible issue with texture afterwards)
 }
 
 void print_end_game(textRender& textRenderer, unsigned int nb_shots) {
@@ -55,7 +54,9 @@ void scene_model::draw_objects(std::map<std::string,GLuint>& shaders, scene_stru
     glBindTexture(GL_TEXTURE_2D, scene.texture_white); // To reset the texture
     display_particles(scene);
 
-    draw(borders, scene.camera);
+    if (display_aabb)
+        draw(borders, scene.camera);
+
     if (not in_animation)
         draw_cue(shaders, scene);
 
@@ -78,7 +79,6 @@ void scene_model::frame_draw(std::map<std::string,GLuint>& shaders, scene_struct
         animation_camera::update_camera(scene, animationCamera.interpolate_reference_position(t),
                                       animationCamera.interpolate_camera_position(t));
         draw_objects(shaders, scene);
-        //return;
     }
 
     float partial_alpha = std::pow(alpha, 1.0/steps_in_frame);
@@ -86,7 +86,6 @@ void scene_model::frame_draw(std::map<std::string,GLuint>& shaders, scene_struct
     for (int i = 0; i < steps_in_frame; ++i) {
         compute_time_step(dt / steps_in_frame, partial_alpha, partial_beta);
     }
-    //compute_time_step(dt);
 
     draw_objects(shaders, scene);
 
@@ -111,9 +110,6 @@ void scene_model::frame_draw(std::map<std::string,GLuint>& shaders, scene_struct
     check_score();
     check_white_ball();
     check_end_game();
-
-    //draw(pool_visual, scene.camera);
-    //glBindTexture(GL_TEXTURE_2D, scene.texture_white);
 }
 
 vcl::vec2 animation_camera::interpolate_camera_position(float t) const {
@@ -204,7 +200,7 @@ void scene_model::check_collisions(float partial_alpha, float partial_beta) {
             float z = std::max(box.minZ, std::min(p.z, box.maxZ));
             vec3 closest_point_aabb = vec3{x, y, z};
 
-            vec3 aabb_vector = p - closest_point_aabb; //TODO what if the center of the ball is so inside the aabb that the vector is reversed
+            vec3 aabb_vector = p - closest_point_aabb;
             float distance_ = vcl::norm(aabb_vector);
             if (distance_ <= r) {
                 vec3 normal = aabb_vector_direction(aabb_vector);
@@ -214,7 +210,6 @@ void scene_model::check_collisions(float partial_alpha, float partial_beta) {
                 v = partial_alpha * v_parallel - partial_beta * v_orthogonal;
                 v.y = std::min(v.y, 0.0f);
                 if (!box.bouncing) {
-                    //v *= 0.7f;
                     v.y = -2.0f; // Prevent balls touching the inside of one hole and bouncing back
                 }
 
@@ -237,8 +232,6 @@ void scene_model::compute_time_step(float dt, float partial_alpha, float partial
         vec3& p = particle.p;
         vec3 const& f = particle.f;
 
-        // TODO change this coefficient or remove it as we already have alpha and beta (why is it here ?)
-        // v = (1-0.9f*dt) * v + dt * f; // gravity + friction force
         v += dt * f; // gravity + friction force
         if (v.y > 0)
             v.y *= 0.98f; // prevent bouncing balls
@@ -254,8 +247,6 @@ void scene_model::white_ball_setup() {
     white_ball.r = radius_ball;
     white_ball.c = vec3(1, 1, 1);
     white_ball.p = white_ball_position;
-    //white_ball.p = vec3(0.55, 0.030000, 0.021925); TODO change to this to see a bug that needs resolving
-
 
     particles.insert(particles.begin(), white_ball);
 }
@@ -275,7 +266,6 @@ void scene_model::triangle_base_configuration() {
         for (size_t j = 0; j < 5 - i; ++j) {
             particle_structure new_ball;
             new_ball.r = radius_ball;
-            //new_ball.c = vec3(rand_interval(0.0f, 1.0f), rand_interval(0.0f, 1.0f), rand_interval(0.0f, 1.0f));
             new_ball.c = color_lut[index];
             new_ball.p = vec3(diameter_ball * (j + i / 2.0f), 0.01f,  i * offset_z) + offset_triangle;
             particles.push_back(new_ball);
@@ -357,9 +347,6 @@ void scene_model::setup_aabb(std::map<std::string, GLuint>& shaders) {
     borders = segments_gpu(segments_from_aabbs((boundaries)));
     borders.uniform.color = {0,0,0};
     borders.shader = shaders["curve"];
-
-    // ground.shader = shaders["mesh_bf"];
-    // ground.texture_id = texture_green;
 }
 
 void scene_model::setup_data(std::map<std::string,GLuint>& shaders, scene_structure& scene, gui_structure& ) {
@@ -377,7 +364,7 @@ void scene_model::setup_data(std::map<std::string,GLuint>& shaders, scene_struct
 
     this->pool = mesh_load_file_obj("scenes/animation/Pool_game/assets/pool.obj");
     this->plane_pool = mesh_load_file_obj("scenes/animation/Pool_game/assets/plane_pool.obj");
-    texture_wood  = create_texture_gpu(image_load_png("scenes/animation/02_simulation/assets/wood.png"));
+    texture_wood  = create_texture_gpu(image_load_png("scenes/animation/Pool_game/assets/wood.png"));
     texture_green  = create_texture_gpu(image_load_png("scenes/animation/Pool_game/assets/green.png"));
     texture_cue = create_texture_gpu(image_load_png("scenes/animation/Pool_game/assets/macassar.png"));
 
@@ -612,10 +599,6 @@ void scene_model::draw_cue(std::map<std::string,GLuint>& shaders, scene_structur
     if (!play_allowed)
         return;
 
-    /* if (!is_throwing)
-        vec_dir = normalize(vec3(0, 0, 0) - particles[0].p);
-    else
-        vec_dir = throw_dir;*/
     vec3 cane_dir_tmp = cane_direction;
     cane_dir_tmp.y = -0.2f;
     cane_dir_tmp = normalize(cane_dir_tmp);

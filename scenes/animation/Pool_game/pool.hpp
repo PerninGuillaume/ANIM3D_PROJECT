@@ -120,6 +120,8 @@ struct scene_model : scene_base
     bool animateCamera = true;
     animation_camera animationCamera;
 
+    bool display_aabb = false;
+
     bool is_throwing = false;
     vcl::vec3 throw_pos = vcl::vec3(0, 0, 0);
     vcl::vec3 cane_direction = vcl::vec3(0,-0.2,-1);
